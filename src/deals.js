@@ -87,7 +87,7 @@
   }
   const P = {
     key: 'bbd_v1', hostRe: /(^|\.)bigbasket\.com$/,
-    defaults: { groups: ['staples', 'dairy', 'snacks'], depth: 2 },
+    defaults: { groups: ['staples', 'dairy', 'snacks'], depth: 1 },
     workers: 2,
     jobs: st => { const jobs = []; for (const g of GROUPS) if (st.groups.includes(g.id)) for (const [c, n] of g.subs) jobs.push({ g, name: n, slug: c }); return jobs; },
     fetchPage,
@@ -109,7 +109,7 @@
   store.groups = (store.groups || []).filter(id => GROUPS.some(g => g.id === id));
   if (!store.groups.length) store.groups = defaults.groups.slice();
   // v3: Hunter scans every category by itself and leads with the biggest discounts.
-  if (store.v !== 3) { store.groups = GROUPS.map(g => g.id); store.sort = 'disc'; store.depth = 2; store.v = 3; save(); }
+  if (store.v !== 3) { store.groups = GROUPS.map(g => g.id); store.sort = 'disc'; store.depth = (typeof P !== 'undefined' && P.defaults && P.defaults.depth) || 2; store.v = 3; save(); }
 
   // ───────────────────────── State ─────────────────────────
   const S = { products: new Map(), scanning: false, done: 0, total: 0, errors: 0, ctl: { stop: false },
