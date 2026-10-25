@@ -1,11 +1,13 @@
 # PriceDrop Hunter for BigBasket
 
-Scans BigBasket categories through its listing API, ranks products by real savings, and tracks price changes between scans. It runs in your own browser as a bookmarklet or userscript. Nothing is uploaded and there is no account.
+Scans every BigBasket category through its listing API and opens with the biggest discounts, then the best deals of each category. It runs in your own browser as a bookmarklet or userscript. Nothing is uploaded and there is no account.
 
 **Live page:** https://stymrj.github.io/BigBasket-Deals/
 
 ## Features
 
+- Opens with the biggest discounts, across every category, scanned by itself
+- Best deals of each category in one swipeable row, with See all
 - Ranks by percent off and rupees saved together
 - Labels products that are new, cheaper than last time, or at their lowest price ever
 - Price history sparkline on every product you have seen before
@@ -148,13 +150,12 @@ A session cookie works like your password for that site. Keep it only in GitHub 
 
 ## How it gets data
 
-Calls `listing-svc/v2/products` with the same headers the BigBasket site sends, from your logged-in session. It scans slowly (two workers, randomised delays) to avoid rate limits, honours `Retry-After`, and stops if BigBasket returns 403.
+Calls `listing-svc/v2/products` with the same headers the BigBasket site sends, from your tab. It scans slowly (two at a time, random pauses), honours `Retry-After`, and stops if BigBasket returns 403.
 
 ## Limitations
 
-- Only five category slugs are confirmed (`dairy`, `biscuits-cookies`, `foodgrains-oil-masala`, `edible-oils-ghee`, `beverages`); the rest are likely guesses.
-- One page per category is fetched by default; depth is limited to keep the request rate low.
-- The endpoint is undocumented and can change.
+- BigBasket blocks pages from loading code or calling Telegram from other sites. Use the full bookmarklet (not the mobile loader), and the userscript for Telegram alerts.
+- All 14 category slugs were checked against live data; BigBasket can rename them at any time.
 
 ## Project layout
 
