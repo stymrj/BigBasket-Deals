@@ -27,8 +27,6 @@ Scans BigBasket categories through its listing API, ranks products by real savin
 
 **Userscript.** Install `dist/bigbasket-deals.user.js` in Tampermonkey or Violentmonkey. A small Deals button appears on every bigbasket.com page.
 
-**Demo.** Use "Try the demo" on the install page to explore the interface with sample data.
-
 ## Keyboard shortcuts
 
 `/` search, `S` scan or stop, `Esc` close.
