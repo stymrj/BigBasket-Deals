@@ -28,6 +28,18 @@ Scans BigBasket categories through its listing API, ranks products by real savin
 
 `/` search, `S` scan or stop, `Esc` close.
 
+## Telegram alerts
+
+Hunter can send new deals, price drops and cheaper saved items to your Telegram.
+
+1. In Telegram, open `@BotFather`, send `/newbot`, and copy the bot token.
+2. Open your new bot and press **Start**.
+3. Get your chat ID from `@userinfobot`, or open `https://api.telegram.org/bot<token>/getUpdates` and copy `chat.id`.
+4. In Hunter's sidebar, open **Telegram alerts**, paste the token and chat ID, press **Send test message**, then switch alerts on.
+5. Optional: set **Auto-scan** (for example every 15 minutes) and keep the tab open.
+
+Each deal is sent once, and again only if its price drops further. Use the userscript for alerts: some shops block bookmarklets from calling Telegram, while the userscript sends through `GM_xmlhttpRequest`. The token is stored only in your browser.
+
 ## How it gets data
 
 Calls `listing-svc/v2/products` with the same headers the BigBasket site sends, from your logged-in session. It scans slowly (two workers, randomised delays) to avoid rate limits, honours `Retry-After`, and stops if BigBasket returns 403.
