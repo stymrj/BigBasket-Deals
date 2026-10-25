@@ -23,7 +23,7 @@ Scans BigBasket categories through its listing API, ranks products by real savin
 
 **Bookmarklet (desktop).** Run `node build.js`, open `index.html`, and drag the button to your bookmarks bar. Open bigbasket.com and click the bookmark.
 
-**Bookmarklet (mobile).** Copy the code from the page, create a bookmark, and paste the code as its address. Run it from the address bar on bigbasket.com.
+**Bookmarklet (mobile).** On the install page, tap **Copy mobile loader**. It is a bookmark of about 380 characters that loads the latest version from GitHub Pages, so it fits on any phone. Create a bookmark, paste it as the address, and run it from the address bar on bigbasket.com. The full bookmarklet (about 45 KB, no network needed) is in `dist/bookmarklet.txt`.
 
 **Userscript.** Install `dist/bigbasket-deals.user.js` in Tampermonkey or Violentmonkey. A small Deals button appears on every bigbasket.com page.
 
