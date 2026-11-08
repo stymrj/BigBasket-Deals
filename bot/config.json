@@ -14,6 +14,10 @@
         [
           "edible-oils-ghee",
           "Edible Oils & Ghee"
+        ],
+        [
+          "dry-fruits",
+          "Dry Fruits"
         ]
       ]
     },
@@ -51,6 +55,10 @@
         [
           "snacks-branded-foods",
           "Snacks & Branded Foods"
+        ],
+        [
+          "chocolates-candies",
+          "Chocolates & Candies"
         ]
       ]
     },
@@ -77,6 +85,22 @@
         [
           "baby-care",
           "Baby Care"
+        ],
+        [
+          "skin-care",
+          "Skin Care"
+        ],
+        [
+          "hair-care",
+          "Hair Care"
+        ],
+        [
+          "bath-hand-wash",
+          "Bath & Hand Wash"
+        ],
+        [
+          "diapers-wipes",
+          "Diapers & Wipes"
         ]
       ]
     },
@@ -88,6 +112,10 @@
         [
           "cleaning-household",
           "Cleaning & Household"
+        ],
+        [
+          "detergents-dishwash",
+          "Detergents & Dishwash"
         ]
       ]
     }

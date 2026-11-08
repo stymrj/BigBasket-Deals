@@ -1,0 +1,215 @@
+{
+  "tabs": [
+    {
+      "product_info": {
+        "products": [
+          {
+            "id": 201,
+            "desc": "Test Tata Salt",
+            "w": "1 kg",
+            "pricing": {
+              "discount": {
+                "mrp": 120,
+                "prim_price": {
+                  "sp": 60
+                }
+              }
+            },
+            "images": [
+              {
+                "s": "https://example.com/bb201.jpg"
+              }
+            ],
+            "absolute_url": "/pd/201",
+            "availability": {
+              "is_available": true,
+              "avail_status": "001"
+            }
+          },
+          {
+            "id": 202,
+            "desc": "Test Fortune Oil",
+            "w": "1 L",
+            "pricing": {
+              "discount": {
+                "mrp": 300,
+                "prim_price": {
+                  "sp": 150
+                }
+              }
+            },
+            "images": [
+              {
+                "s": "https://example.com/bb202.jpg"
+              }
+            ],
+            "absolute_url": "/pd/202",
+            "availability": {
+              "is_available": true,
+              "avail_status": "001"
+            },
+            "children": [
+              {
+                "id": 203,
+                "desc": "Test Fortune Oil",
+                "w": "500 ml",
+                "pricing": {
+                  "discount": {
+                    "mrp": 160,
+                    "prim_price": {
+                      "sp": 80
+                    }
+                  }
+                },
+                "images": [
+                  {
+                    "s": "https://example.com/bb203.jpg"
+                  }
+                ],
+                "absolute_url": "/pd/203",
+                "availability": {
+                  "is_available": true,
+                  "avail_status": "001"
+                }
+              },
+              {
+                "id": 204,
+                "desc": "Test Fortune Oil",
+                "w": "5 L",
+                "pricing": {
+                  "discount": {
+                    "mrp": 1400,
+                    "prim_price": {
+                      "sp": 700
+                    }
+                  }
+                },
+                "images": [
+                  {
+                    "s": "https://example.com/bb204.jpg"
+                  }
+                ],
+                "absolute_url": "/pd/204",
+                "availability": {
+                  "is_available": true,
+                  "avail_status": "001"
+                }
+              }
+            ]
+          },
+          {
+            "id": 205,
+            "desc": "Test OOS Dal",
+            "w": "1 kg",
+            "pricing": {
+              "discount": {
+                "mrp": 200,
+                "prim_price": {
+                  "sp": 100
+                }
+              }
+            },
+            "images": [
+              {
+                "s": "https://example.com/bb205.jpg"
+              }
+            ],
+            "absolute_url": "/pd/205",
+            "availability": {
+              "is_available": true,
+              "avail_status": "001",
+              "button_state": "OUT_OF_STOCK"
+            }
+          },
+          {
+            "id": 206,
+            "desc": "Test Gone Sugar",
+            "w": "1 kg",
+            "pricing": {
+              "discount": {
+                "mrp": 100,
+                "prim_price": {
+                  "sp": 50
+                }
+              }
+            },
+            "images": [
+              {
+                "s": "https://example.com/bb206.jpg"
+              }
+            ],
+            "absolute_url": "/pd/206",
+            "availability": {
+              "is_available": true,
+              "avail_status": "002"
+            }
+          },
+          {
+            "id": 207,
+            "desc": "Test No Image Rice",
+            "w": "5 kg",
+            "pricing": {
+              "discount": {
+                "mrp": 400,
+                "prim_price": {
+                  "sp": 199
+                }
+              }
+            },
+            "images": [],
+            "absolute_url": "/pd/207",
+            "availability": {
+              "is_available": true,
+              "avail_status": "001"
+            }
+          },
+          {
+            "desc": "Test No ID Product",
+            "w": "500 g",
+            "pricing": {
+              "discount": {
+                "mrp": 100,
+                "prim_price": {
+                  "sp": 50
+                }
+              }
+            },
+            "images": [
+              {
+                "s": "https://example.com/bb-noid.jpg"
+              }
+            ],
+            "absolute_url": "/pd/noid",
+            "availability": {
+              "is_available": true,
+              "avail_status": "001"
+            }
+          },
+          {
+            "id": 208,
+            "desc": "Test Zero SP Milk",
+            "w": "1 L",
+            "pricing": {
+              "discount": {
+                "mrp": 90,
+                "prim_price": {
+                  "sp": 0
+                }
+              }
+            },
+            "images": [
+              {
+                "s": "https://example.com/bb208.jpg"
+              }
+            ],
+            "absolute_url": "/pd/208",
+            "availability": {
+              "is_available": true,
+              "avail_status": "001"
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
