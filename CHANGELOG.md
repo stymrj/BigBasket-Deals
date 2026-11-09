@@ -2,6 +2,7 @@
 
 ## v2.0.0 — 2026-11-08
 - Fixed (2026-11-09): install button now reads “BigBasket Deals” instead of the generic “PriceDrop Hunter”, so the dragged bookmark is named after this store instead of colliding with every other tool.
+- Fixed (2026-11-09): highest-discount products were missed — the paging signal read the last item's discount, and a low-discount child variant trailing page 1 stopped the scan, so page 2 was never fetched; it now reads the lowest discount among top-level products. Also: object-wrapped MRP/selling prices are now read (they parsed as 0, so the item vanished or lost its discount), and the selling price and MRP are also read from a bare `prim_price` number and from `prim_price.mrp`. Same fixes mirrored in `bot/platform.js`, and the bot's early-stop now uses the same tail discount in `bot/core.js`. No version bump (stays 2.0.0).
 
 - Strict stock rules: `avail_status` `'001'` means in stock and anything else
   present means out of stock, plus `availability.button_state`,

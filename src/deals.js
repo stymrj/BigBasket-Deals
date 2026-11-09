@@ -14,7 +14,21 @@
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const debounce = (f, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f(...a), ms); }; };
 
-  const price = v => { if (v == null) return 0; if (typeof v === 'number') return v; const m = String(v).replace(/,/g, '').match(/\d+(\.\d+)?/); return m ? +m[0] : 0; };
+  // Prices can arrive wrapped in an object ({value: ...} / {amount: ...} /
+  // {text: "₹1,999"}), like the bot's price() already handled: reading such
+  // a value as a string gave 0, so the item lost its discount or vanished
+  // entirely (selling price 0 returns null from normalise).
+  const price = v => {
+    if (v == null) return 0;
+    if (typeof v === 'number') return v;
+    if (typeof v === 'object') {
+      for (const k of ['value', 'amount', 'text', 'defaultValue']) { const p = price(v[k]); if (p > 0) return p; }
+      if (v.tracking && typeof v.tracking === 'object') { const p = price(v.tracking.fsp) || price(v.tracking.mrp); if (p > 0) return p; }
+      return 0;
+    }
+    const m = String(v).replace(/,/g, '').match(/\d+(\.\d+)?/);
+    return m ? +m[0] : 0;
+  };
   const guessBrand = t => (String(t).trim().split(/\s+/)[0] || '').replace(/[^\w&'-]/g, '');
   const EXCLUDED = [];
   const allowed = p => { const t = p.title.toLowerCase(); return !EXCLUDED.some(k => t.includes(k)); };
@@ -50,8 +64,11 @@
   const BB_IMG_FALLBACK = 'https://www.bigbasket.com/static/images/default.jpg';
   function normalise(p, cat) {
     const pr = p.pricing || {}, dsc = pr.discount || {};
-    const mrp0 = price(dsc.mrp || pr.mrp || p.mrp);
-    const sp = price((dsc.prim_price && dsc.prim_price.sp) || pr.offer_price || pr.sp || p.sp) || mrp0;
+    // MRP can also hide inside prim_price, and the selling price can be a
+    // bare prim_price number (no .sp): both used to read as 0, leaving the
+    // item with no discount (or, with no MRP at all, priced at its own MRP).
+    const mrp0 = price(dsc.mrp || (dsc.prim_price && dsc.prim_price.mrp) || pr.mrp || p.mrp);
+    const sp = price((dsc.prim_price && dsc.prim_price.sp) || dsc.prim_price || pr.offer_price || pr.sp || p.sp) || mrp0;
     const title0 = p.desc || p.p_desc || p.name || 'Product', w = p.w || p.pack_desc || '';
     if (!sp) return null;
     const mrp = mrp0 < sp ? sp : mrp0;
@@ -92,16 +109,21 @@
     return { total: 3, got: items.length, bad: bad.length, pass: items.length === 3 && !bad.length };
   }
   function extract(json, cat) {
-    const out = [], seen = new Set();
+    const out = [], seen = new Set(), topDiscs = [];
     let items = items0(json);
     if (!items.length) items = walkProducts(json);
     for (const p of items) {
-      for (const c of [p].concat(p.children || [])) {
-        const n = normalise(c, cat); // each variant parsed on its own, never merged into the parent
-        if (n && !seen.has(n.id)) { seen.add(n.id); out.push(n); }
+      const variants = [p].concat(p.children || []);
+      for (let ci = 0; ci < variants.length; ci++) {
+        const n = normalise(variants[ci], cat); // each variant parsed on its own, never merged into the parent
+        if (n && !seen.has(n.id)) { seen.add(n.id); out.push(n); if (ci === 0) topDiscs.push(n.disc); }
       }
     }
-    out.tailDisc = out.length ? out[out.length - 1].disc : 0;
+    // Paging signal: the lowest discount among top-level products only.
+    // Child variants ride along with their parent and can sit last in the
+    // array, so reading the last item's discount stopped paging after
+    // page 1 whenever a low-discount variant trailed a page of 70-95% deals.
+    out.tailDisc = topDiscs.length ? Math.min(...topDiscs) : (out.length ? Math.min(...out.map(p => p.disc)) : 0);
     out.totalFound = out.length;
     // Pages are discount-sorted, so a low tail discount means deeper pages add nothing.
     out.more = out.tailDisc >= 20;

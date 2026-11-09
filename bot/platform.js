@@ -27,8 +27,11 @@ function walkProducts(json) {
 }
 function normalise(p, cat, { price, brandOf }) {
   const pr = p.pricing || {}, dsc = pr.discount || {};
-  const mrp0 = price(dsc.mrp || pr.mrp || p.mrp);
-  const sp = price((dsc.prim_price && dsc.prim_price.sp) || pr.offer_price || pr.sp || p.sp) || mrp0;
+  // MRP can also hide inside prim_price, and the selling price can be a
+  // bare prim_price number (no .sp): both used to read as 0, leaving the
+  // item with no discount (or, with no MRP at all, priced at its own MRP).
+  const mrp0 = price(dsc.mrp || (dsc.prim_price && dsc.prim_price.mrp) || pr.mrp || p.mrp);
+  const sp = price((dsc.prim_price && dsc.prim_price.sp) || dsc.prim_price || pr.offer_price || pr.sp || p.sp) || mrp0;
   const title = p.desc || p.p_desc || p.name || 'Product', w = p.w || p.pack_desc || '';
   if (!sp) return null;
   const mrp = mrp0 < sp ? sp : mrp0, av = p.availability || {}, u = p.absolute_url || '/pd/' + (p.id || '');
@@ -42,14 +45,21 @@ function normalise(p, cat, { price, brandOf }) {
   return { id, title: String(title) + (w ? ' · ' + w : ''), brand: String((p.brand && p.brand.name) || p.p_brand || brandOf(title)), price: sp, mrp, disc: mrp > sp ? Math.round((mrp - sp) / mrp * 100) : 0, url: /^http/.test(u) ? u : 'https://www.bigbasket.com' + u, inStock: !oos, cat };
 }
 function extract(json, cat, ctx) {
-  const out = [], seen = new Set();
+  const out = [], seen = new Set(), topDiscs = [];
   let items = items0(json);
   if (!items.length) items = walkProducts(json);
-  for (const p of items) for (const c of [p].concat(p.children || [])) {
-    const n = normalise(c, cat, ctx); // each variant parsed on its own, never merged into the parent
-    if (n && !seen.has(n.id)) { seen.add(n.id); out.push(n); }
+  for (const p of items) {
+    const variants = [p].concat(p.children || []);
+    for (let ci = 0; ci < variants.length; ci++) {
+      const n = normalise(variants[ci], cat, ctx); // each variant parsed on its own, never merged into the parent
+      if (n && !seen.has(n.id)) { seen.add(n.id); out.push(n); if (ci === 0) topDiscs.push(n.disc); }
+    }
   }
-  out.tailDisc = out.length ? out[out.length - 1].disc : 0;
+  // Paging signal: the lowest discount among top-level products only.
+  // Child variants ride along with their parent and can sit last in the
+  // array, so reading the last item's discount stopped paging after
+  // page 1 whenever a low-discount variant trailed a page of 70-95% deals.
+  out.tailDisc = topDiscs.length ? Math.min(...topDiscs) : (out.length ? Math.min(...out.map(p => p.disc)) : 0);
   out.totalFound = out.length;
   out.more = out.tailDisc >= 20;
   return out;

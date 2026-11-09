@@ -119,7 +119,11 @@ async function run(platform, argv = process.argv.slice(2)) {
       for (const p of items) { if (!found.has(p.id) || job.min < found.get(p.id).min) found.set(p.id, Object.assign(p, { min: job.min })); }
       if (items.more === false || !items.length) break;
       // Only stores that return results sorted by discount can stop early.
-      if (platform.sortedByDiscount && (items.length < (platform.pageSize || 10) || items[items.length - 1].disc < job.min)) break;
+      // The signal is the page's tail discount (lowest discount in the
+      // sorted listing, set by extract) — not the last array item, which
+      // can be a low-discount recommendation card or child variant.
+      const tail = items.tailDisc != null ? items.tailDisc : (items.length ? items[items.length - 1].disc : 0);
+      if (platform.sortedByDiscount && (items.length < (platform.pageSize || 10) || tail < job.min)) break;
     }
   });
   if (blocked) console.error('Stopped: ' + blocked);
