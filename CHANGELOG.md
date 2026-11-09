@@ -1,6 +1,7 @@
 # Changelog
 
 ## v2.0.0 — 2026-11-08
+- Fixed (2026-11-09): install button now reads “BigBasket Deals” instead of the generic “PriceDrop Hunter”, so the dragged bookmark is named after this store instead of colliding with every other tool.
 
 - Strict stock rules: `avail_status` `'001'` means in stock and anything else
   present means out of stock, plus `availability.button_state`,

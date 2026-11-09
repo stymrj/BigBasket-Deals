@@ -18,6 +18,7 @@ Scans the BigBasket categories you pick through its listing API and shows the bi
 - **7 new category slugs:** Dry Fruits, Chocolates & Candies, Skin Care, Hair Care, Bath & Hand Wash, Diapers & Wipes, Detergents & Dishwash — 21 slugs in total.
 - **Multi-keyword search:** comma separates OR groups, spaces inside a group are AND — `atta, rice` finds either; `atta 1kg` needs both words.
 - **JSON export** alongside CSV, from the same filtered list.
+- **Bookmark name fixed:** the install button now reads **BigBasket Deals** instead of the generic “PriceDrop Hunter”, so the bookmark you drag to your bookmarks bar is named after this store.
 
 ## Why v2 is stronger
 
@@ -50,9 +51,9 @@ Scans the BigBasket categories you pick through its listing API and shows the bi
 
 [Watch the walkthrough video (MP4)](https://stymrj.github.io/PriceDrop-Hunter/media/install-demo.mp4)
 
-**Bookmarklet (desktop).** Run `node build.js`, open `index.html`, and drag the button to your bookmarks bar. Open bigbasket.com and click the bookmark.
+**Bookmarklet (desktop).** Run `node build.js`, open `index.html`, and drag the **BigBasket Deals** button to your bookmarks bar. Open bigbasket.com and click the bookmark.
 
-**Bookmarklet (mobile).** On the install page, tap **Copy mobile loader**. It is a bookmark of about 380 characters that loads the latest version from GitHub Pages, so it fits on any phone. Create a bookmark, paste it as the address, and run it from the address bar on bigbasket.com. The full bookmarklet (about 45 KB, no network needed) is in `dist/bookmarklet.txt`.
+**Bookmarklet (mobile).** On the install page, tap **Copy mobile loader**. It is a bookmark of about 380 characters that loads the latest version from GitHub Pages, so it fits on any phone. Create a bookmark named **BigBasket Deals**, paste it as the address, and run it from the address bar on bigbasket.com. The full bookmarklet (about 45 KB, no network needed) is in `dist/bookmarklet.txt`.
 
 **Userscript.** Install `dist/bigbasket-deals.user.js` in Tampermonkey or Violentmonkey. A small Deals button appears on every bigbasket.com page.
 
