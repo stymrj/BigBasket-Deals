@@ -8,7 +8,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const price = v => {
   if (v == null) return 0;
   if (typeof v === 'number') return v;
-  if (typeof v === 'object') { for (const k of ['value', 'amount', 'text', 'defaultValue']) { const p = price(v[k]); if (p > 0) return p; } return 0; }
+  if (typeof v === 'object') { for (const k of ['value', 'amount', 'text', 'defaultValue']) { const p = price(v[k]); if (p > 0) return p; } if (v.tracking && typeof v.tracking === 'object') { const p = price(v.tracking.fsp) || price(v.tracking.mrp); if (p > 0) return p; } return 0; }
   const m = String(v).replace(/,/g, '').match(/\d+(\.\d+)?/);
   return m ? +m[0] : 0;
 };
@@ -119,7 +119,11 @@ async function run(platform, argv = process.argv.slice(2)) {
       for (const p of items) { if (!found.has(p.id) || job.min < found.get(p.id).min) found.set(p.id, Object.assign(p, { min: job.min })); }
       if (items.more === false || !items.length) break;
       // Only stores that return results sorted by discount can stop early.
-      if (platform.sortedByDiscount && (items.length < (platform.pageSize || 10) || items[items.length - 1].disc < job.min)) break;
+      // The signal is the page's tail discount (lowest discount in the
+      // sorted listing, set by extract) — not the last array item, which
+      // can be a low-discount recommendation card or child variant.
+      const tail = items.tailDisc != null ? items.tailDisc : (items.length ? items[items.length - 1].disc : 0);
+      if (platform.sortedByDiscount && (items.length < (platform.pageSize || 10) || tail < job.min)) break;
     }
   });
   if (blocked) console.error('Stopped: ' + blocked);

@@ -1,0 +1,246 @@
+{
+ "tabs": [
+  {
+   "product_info": {
+    "products": [
+     {
+      "absolute_url": "/pd/901",
+      "availability": {
+       "avail_status": "001",
+       "is_available": true
+      },
+      "desc": "HD Clearance Mixer 95",
+      "id": 901,
+      "images": [
+       {
+        "s": "https://example.com/hd95.jpg"
+       }
+      ],
+      "pricing": {
+       "discount": {
+        "mrp": 2000,
+        "prim_price": {
+         "sp": 100
+        }
+       }
+      },
+      "w": "1 pc"
+     },
+     {
+      "absolute_url": "/pd/902",
+      "availability": {
+       "avail_status": "001",
+       "is_available": true
+      },
+      "desc": "HD String MRP Rice 90",
+      "id": 902,
+      "images": [
+       {
+        "s": "https://example.com/hd90.jpg"
+       }
+      ],
+      "pricing": {
+       "discount": {
+        "mrp": "\u20b91,999",
+        "prim_price": {
+         "sp": "\u20b9199"
+        }
+       }
+      },
+      "w": "1 kg"
+     },
+     {
+      "absolute_url": "/pd/903",
+      "availability": {
+       "avail_status": "001",
+       "is_available": true
+      },
+      "desc": "HD Object Price Tea 85",
+      "id": 903,
+      "images": [
+       {
+        "s": "https://example.com/hd85.jpg"
+       }
+      ],
+      "pricing": {
+       "discount": {
+        "mrp": {
+         "value": 1000
+        },
+        "prim_price": {
+         "sp": {
+          "value": 150
+         }
+        }
+       }
+      },
+      "w": "250 g"
+     },
+     {
+      "absolute_url": "/pd/904",
+      "availability": {
+       "avail_status": "001",
+       "is_available": true
+      },
+      "desc": "HD Bare Prim Price Coffee 90",
+      "id": 904,
+      "images": [
+       {
+        "s": "https://example.com/hd90.jpg"
+       }
+      ],
+      "pricing": {
+       "discount": {
+        "mrp": 990,
+        "prim_price": 99
+       }
+      },
+      "w": "100 g"
+     },
+     {
+      "absolute_url": "/pd/905",
+      "availability": {
+       "avail_status": "001",
+       "is_available": true
+      },
+      "desc": "HD Prim MRP Dal 85",
+      "id": 905,
+      "images": [
+       {
+        "s": "https://example.com/hd85.jpg"
+       }
+      ],
+      "pricing": {
+       "discount": {
+        "prim_price": {
+         "mrp": 1000,
+         "sp": 150
+        }
+       }
+      },
+      "w": "1 kg"
+     },
+     {
+      "absolute_url": "/pd/906",
+      "availability": {
+       "avail_status": "001",
+       "is_available": true
+      },
+      "children": [
+       {
+        "absolute_url": "/pd/907",
+        "availability": {
+         "avail_status": "001",
+         "is_available": true
+        },
+        "desc": "HD Mid Child Variant 90",
+        "id": 907,
+        "images": [
+         {
+          "s": "https://example.com/hd90child.jpg"
+         }
+        ],
+        "pricing": {
+         "discount": {
+          "mrp": 1000,
+          "prim_price": {
+           "sp": 100
+          }
+         }
+        },
+        "w": "100 g"
+       }
+      ],
+      "desc": "HD Mid Parent 70",
+      "id": 906,
+      "images": [
+       {
+        "s": "https://example.com/hd40.jpg"
+       }
+      ],
+      "pricing": {
+       "discount": {
+        "mrp": 1000,
+        "prim_price": {
+         "sp": 300
+        }
+       }
+      },
+      "w": "500 g"
+     },
+     {
+      "absolute_url": "/pd/910",
+      "availability": {
+       "avail_status": "002",
+       "is_available": true
+      },
+      "desc": "HD Out Of Stock Ghee 90",
+      "id": 910,
+      "images": [
+       {
+        "s": "https://example.com/hd90oos.jpg"
+       }
+      ],
+      "pricing": {
+       "discount": {
+        "mrp": 1000,
+        "prim_price": {
+         "sp": 100
+        }
+       }
+      },
+      "w": "1 L"
+     },
+     {
+      "absolute_url": "/pd/908",
+      "availability": {
+       "avail_status": "001",
+       "is_available": true
+      },
+      "children": [
+       {
+        "absolute_url": "/pd/909",
+        "availability": {
+         "avail_status": "001",
+         "is_available": true
+        },
+        "desc": "HD Last Child Variant 10",
+        "id": 909,
+        "images": [
+         {
+          "s": "https://example.com/hd10child.jpg"
+         }
+        ],
+        "pricing": {
+         "discount": {
+          "mrp": 100,
+          "prim_price": {
+           "sp": 90
+          }
+         }
+        },
+        "w": "100 ml"
+       }
+      ],
+      "desc": "HD Last Top Ghee 85",
+      "id": 908,
+      "images": [
+       {
+        "s": "https://example.com/hd85.jpg"
+       }
+      ],
+      "pricing": {
+       "discount": {
+        "mrp": 1000,
+        "prim_price": {
+         "sp": 150
+        }
+       }
+      },
+      "w": "1 L"
+     }
+    ]
+   }
+  }
+ ]
+}

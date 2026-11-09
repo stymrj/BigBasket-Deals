@@ -14,7 +14,21 @@
   const sleep = ms => new Promise(r => setTimeout(r, ms));
   const debounce = (f, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f(...a), ms); }; };
 
-  const price = v => { if (v == null) return 0; if (typeof v === 'number') return v; const m = String(v).replace(/,/g, '').match(/\d+(\.\d+)?/); return m ? +m[0] : 0; };
+  // Prices can arrive wrapped in an object ({value: ...} / {amount: ...} /
+  // {text: "₹1,999"}), like the bot's price() already handled: reading such
+  // a value as a string gave 0, so the item lost its discount or vanished
+  // entirely (selling price 0 returns null from normalise).
+  const price = v => {
+    if (v == null) return 0;
+    if (typeof v === 'number') return v;
+    if (typeof v === 'object') {
+      for (const k of ['value', 'amount', 'text', 'defaultValue']) { const p = price(v[k]); if (p > 0) return p; }
+      if (v.tracking && typeof v.tracking === 'object') { const p = price(v.tracking.fsp) || price(v.tracking.mrp); if (p > 0) return p; }
+      return 0;
+    }
+    const m = String(v).replace(/,/g, '').match(/\d+(\.\d+)?/);
+    return m ? +m[0] : 0;
+  };
   const guessBrand = t => (String(t).trim().split(/\s+/)[0] || '').replace(/[^\w&'-]/g, '');
   const EXCLUDED = [];
   const allowed = p => { const t = p.title.toLowerCase(); return !EXCLUDED.some(k => t.includes(k)); };
@@ -24,19 +38,22 @@
   const G = (id, name, subs) => ({ id, name, subs });
   const GROUPS = [
     G('fresh', 'Fruits & Vegetables', [['fruits-vegetables', 'Fruits & Vegetables']]),
-    G('staples', 'Staples & Oil', [['foodgrains-oil-masala', 'Foodgrains, Oil & Masala'], ['edible-oils-ghee', 'Edible Oils & Ghee']]),
+    G('staples', 'Staples & Oil', [['foodgrains-oil-masala', 'Foodgrains, Oil & Masala'], ['edible-oils-ghee', 'Edible Oils & Ghee'], ['dry-fruits', 'Dry Fruits']]),
     G('dairy', 'Dairy & Bakery', [['dairy', 'Dairy'], ['bakery-cakes-dairy', 'Bakery, Cakes & Dairy']]),
     G('drinks', 'Beverages', [['beverages', 'Beverages']]),
-    G('snacks', 'Snacks', [['biscuits-cookies', 'Biscuits & Cookies'], ['snacks-branded-foods', 'Snacks & Branded Foods']]),
-    G('care', 'Beauty & Baby', [['beauty-hygiene', 'Beauty & Hygiene'], ['baby-care', 'Baby Care']]),
-    G('home', 'Home', [['cleaning-household', 'Cleaning & Household'], ['kitchen-garden-pets', 'Kitchen, Garden & Pets']]),
+    G('snacks', 'Snacks', [['biscuits-cookies', 'Biscuits & Cookies'], ['snacks-branded-foods', 'Snacks & Branded Foods'], ['chocolates-candies', 'Chocolates & Candies']]),
+    G('care', 'Beauty & Baby', [['beauty-hygiene', 'Beauty & Hygiene'], ['baby-care', 'Baby Care'], ['skin-care', 'Skin Care'], ['hair-care', 'Hair Care'], ['bath-hand-wash', 'Bath & Hand Wash'], ['diapers-wipes', 'Diapers & Wipes']]),
+    G('home', 'Home', [['cleaning-household', 'Cleaning & Household'], ['kitchen-garden-pets', 'Kitchen, Garden & Pets'], ['detergents-dishwash', 'Detergents & Dishwash']]),
     G('meat', 'Eggs, Meat & Fish', [['eggs-meat-fish', 'Eggs, Meat & Fish']]),
     G('gourmet', 'Gourmet', [['gourmet-world-food', 'Gourmet & World Food']])
   ];
   let blocked = false;
+  let trackerVal = null;
   const tracker = () => {
-    try { for (let i = 0; i < sessionStorage.length; i++) { const k = sessionStorage.key(i); if (/tracker/i.test(k)) { const v = sessionStorage.getItem(k); if (v && v.length > 10) return v; } } } catch (e) { /* ignore */ }
-    return (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'bb-' + Date.now();
+    if (trackerVal) return trackerVal;
+    try { for (let i = 0; i < sessionStorage.length; i++) { const k = sessionStorage.key(i); if (/tracker/i.test(k)) { const v = sessionStorage.getItem(k); if (v && v.length > 10) return (trackerVal = v); } } } catch (e) { /* ignore */ }
+    trackerVal = (window.crypto && crypto.randomUUID) ? crypto.randomUUID() : 'bb-' + Date.now();
+    return trackerVal;
   };
   const items0 = j => {
     if (!j) return [];
@@ -44,42 +61,86 @@
     if (j.product_info && j.product_info.products) return j.product_info.products;
     return Array.isArray(j.products) ? j.products : [];
   };
+  const BB_IMG_FALLBACK = 'https://www.bigbasket.com/static/images/default.jpg';
   function normalise(p, cat) {
     const pr = p.pricing || {}, dsc = pr.discount || {};
-    const mrp0 = price(dsc.mrp || pr.mrp || p.mrp);
-    const sp = price((dsc.prim_price && dsc.prim_price.sp) || pr.offer_price || pr.sp || p.sp) || mrp0;
-    const title0 = p.desc || p.p_desc || p.name, w = p.w || p.pack_desc || '';
-    if (!title0 || !sp) return null;
+    // MRP can also hide inside prim_price, and the selling price can be a
+    // bare prim_price number (no .sp): both used to read as 0, leaving the
+    // item with no discount (or, with no MRP at all, priced at its own MRP).
+    const mrp0 = price(dsc.mrp || (dsc.prim_price && dsc.prim_price.mrp) || pr.mrp || p.mrp);
+    const sp = price((dsc.prim_price && dsc.prim_price.sp) || dsc.prim_price || pr.offer_price || pr.sp || p.sp) || mrp0;
+    const title0 = p.desc || p.p_desc || p.name || 'Product', w = p.w || p.pack_desc || '';
+    if (!sp) return null;
     const mrp = mrp0 < sp ? sp : mrp0;
     const im = p.images && p.images[0];
-    const u = p.absolute_url || ('/pd/' + p.id);
+    const u = p.absolute_url || ('/pd/' + (p.id || ''));
     const av = p.availability || {};
-    const oos = av.is_available === false || av.avail_status === '002' || av.avail_status === '000' || ['OUT_OF_STOCK', 'NOT_AVAILABLE', 'COMING_SOON'].includes(p.button_state);
+    // BigBasket marks stock with avail_status '001' = in stock; anything else
+    // present and not '001' is out of stock. Button state lives under
+    // availability (top-level button_state is also accepted).
+    const btn = String(av.button || av.button_state || p.button_state || '').toLowerCase();
+    const inv = p.inv_info || p.inventory || {};
+    const oos = av.is_available === false || av.not_for_sale === true ||
+      (av.avail_status !== undefined && av.avail_status !== null && String(av.avail_status) !== '' && String(av.avail_status) !== '001') ||
+      ['out_of_stock', 'not_available', 'coming_soon', 'notify me', 'sold out'].includes(btn) ||
+      inv.is_out_of_stock === true || (inv.stock_status !== undefined && inv.stock_status !== null && ['000', '002'].includes(String(inv.stock_status)));
     const brand = (p.brand && p.brand.name) || p.p_brand || guessBrand(title0);
-    return { id: String(p.id), title: String(title0) + (w ? ' · ' + w : ''), brand: String(brand), price: sp, mrp, disc: mrp > sp ? Math.round((mrp - sp) / mrp * 100) : 0, save: mrp - sp, img: (im && (im.s || im.m)) || '', url: /^http/.test(u) ? u : 'https://www.bigbasket.com' + u, inStock: !oos, cat };
+    const id = p.id != null ? String(p.id) : (String(title0) + '|' + sp);
+    return { id, title: String(title0) + (w ? ' · ' + w : ''), brand: String(brand), price: sp, mrp, disc: mrp > sp ? Math.round((mrp - sp) / mrp * 100) : 0, save: mrp - sp, img: (im && (im.s || im.m)) || BB_IMG_FALLBACK, url: /^http/.test(u) ? u : 'https://www.bigbasket.com' + u, inStock: !oos, cat };
+  }
+  // Fallback when the listing payload nests products under an unfamiliar key:
+  // walk the whole response for objects that look like products.
+  function walkProducts(json) {
+    const out = [];
+    (function walk(o, d) {
+      if (!o || typeof o !== 'object' || d > 10) return;
+      if (Array.isArray(o)) { for (const x of o) walk(x, d + 1); return; }
+      if (o.pricing && (o.desc || o.p_desc || o.name) && o.id != null) { out.push(o); return; }
+      for (const k in o) walk(o[k], d + 1);
+    })(json, 0);
+    return out;
+  }
+  // Built-in self-test payload: a listing response with a child variant.
+  // The Self-test button in the sidebar runs extract() on this and reports the count.
+  const SELFTEST = {"tabs": [{"product_info": {"products": [{"id": 101, "desc": "Self-Test Atta", "w": "1 kg", "pricing": {"discount": {"mrp": 240, "prim_price": {"sp": 120}}}, "brand": {"name": "TestBrand"}, "images": [{"s": "https://example.com/a.jpg"}], "absolute_url": "/pd/101", "availability": {"is_available": true, "avail_status": "001"}}, {"id": 102, "desc": "Self-Test Rice", "w": "5 kg", "pricing": {"discount": {"mrp": 400, "prim_price": {"sp": 199}}}, "images": [{"s": "https://example.com/b.jpg"}], "absolute_url": "/pd/102", "availability": {"is_available": true, "avail_status": "001"}, "children": [{"id": 103, "desc": "Self-Test Rice", "w": "1 kg", "pricing": {"discount": {"mrp": 90, "prim_price": {"sp": 45}}}, "images": [{"s": "https://example.com/c.jpg"}], "absolute_url": "/pd/103", "availability": {"is_available": true, "avail_status": "001"}}]}]}}]};
+  function selfTest() {
+    const items = extract(SELFTEST, 'Self-test');
+    const bad = items.filter(p => !p.title || !p.price || !p.mrp || !p.url);
+    return { total: 3, got: items.length, bad: bad.length, pass: items.length === 3 && !bad.length };
   }
   function extract(json, cat) {
-    const out = [], seen = new Set();
-    for (const p of items0(json)) {
-      for (const c of [p].concat(p.children || [])) {
-        const n = normalise(c === p ? p : Object.assign({}, p, c), cat);
-        if (n && n.id !== 'undefined' && !seen.has(n.id)) { seen.add(n.id); out.push(n); }
+    const out = [], seen = new Set(), topDiscs = [];
+    let items = items0(json);
+    if (!items.length) items = walkProducts(json);
+    for (const p of items) {
+      const variants = [p].concat(p.children || []);
+      for (let ci = 0; ci < variants.length; ci++) {
+        const n = normalise(variants[ci], cat); // each variant parsed on its own, never merged into the parent
+        if (n && !seen.has(n.id)) { seen.add(n.id); out.push(n); if (ci === 0) topDiscs.push(n.disc); }
       }
     }
+    // Paging signal: the lowest discount among top-level products only.
+    // Child variants ride along with their parent and can sit last in the
+    // array, so reading the last item's discount stopped paging after
+    // page 1 whenever a low-discount variant trailed a page of 70-95% deals.
+    out.tailDisc = topDiscs.length ? Math.min(...topDiscs) : (out.length ? Math.min(...out.map(p => p.disc)) : 0);
+    out.totalFound = out.length;
+    // Pages are discount-sorted, so a low tail discount means deeper pages add nothing.
+    out.more = out.tailDisc >= 20;
     return out;
   }
   async function fetchPage(job, page, ctl) {
     if (blocked) throw new Error('blocked');
-    await sleep(700 + Math.random() * 900);
+    await sleep(2000 + Math.random() * 500);
     const url = 'https://www.bigbasket.com/listing-svc/v2/products?type=pc&slug=' + encodeURIComponent(job.slug) + '&page=' + page + '&sort=dphtl';
     let lastErr;
     for (let a = 0; a < 4; a++) {
       if (ctl.stop) throw new Error('stopped');
       try {
         const r = await W.fetch(url, { credentials: 'include', headers: { accept: 'application/json', 'x-channel': 'BB-WEB', 'x-entry-context': 'bb-b2c', 'x-entry-context-id': '100', 'x-tracker': tracker() } });
-        if (r.status === 403) { blocked = true; ctl.stop = true; throw new Error('blocked'); }
-        if (r.status === 429 || r.status === 503) { const ra = +r.headers.get('retry-after'); await sleep((ra > 0 ? ra * 1000 : 3000 * (a + 1))); continue; }
-        if (!r.ok) return [];
+        if (r.status === 403) { blocked = true; ctl.stop = true; if (S.diag) S.diag.loggedOut = true; throw new Error('blocked'); }
+        if (r.status === 429 || r.status === 503) { if (S.diag) S.diag.rateLimited++; const ra = +r.headers.get('retry-after'); await sleep((ra > 0 ? ra * 1000 : 3000 * (a + 1))); continue; }
+        if (!r.ok) return Object.assign([], { more: false, tailDisc: 0, totalFound: 0 });
         return extract(await r.json(), job.g.name + ' › ' + job.name);
       } catch (e) { if (blocked) throw e; lastErr = e; await sleep(700 * (a + 1)); }
     }
@@ -87,7 +148,7 @@
   }
   const P = {
     key: 'bbd_v1', hostRe: /(^|\.)bigbasket\.com$/,
-    defaults: { groups: ['staples', 'dairy', 'snacks'], depth: 1 },
+    defaults: { groups: ['staples', 'dairy', 'snacks'], depth: 2 },
     workers: 2,
     jobs: st => { const jobs = []; for (const g of GROUPS) if (st.groups.includes(g.id)) for (const [c, n] of g.subs) jobs.push({ g, name: n, slug: c }); return jobs; },
     fetchPage,
@@ -110,11 +171,11 @@
   if (!store.groups.length) store.groups = defaults.groups.slice();
   delete store.auto; // every scan is started by hand
   // v3: Hunter scans every category by itself and leads with the biggest discounts.
-  if (store.v !== 3) { store.groups = GROUPS.map(g => g.id); store.sort = 'disc'; store.depth = (typeof P !== 'undefined' && P.defaults && P.defaults.depth) || 2; store.v = 3; save(); }
+  if (store.v !== 4) { store.groups = GROUPS.map(g => g.id); store.sort = 'disc'; store.depth = (typeof P !== 'undefined' && P.defaults && P.defaults.depth) || 2; store.v = 4; save(); }
 
   // ───────────────────────── State ─────────────────────────
   const S = { products: new Map(), scanning: false, done: 0, total: 0, errors: 0, ctl: { stop: false },
-    q: '', brand: '', cat: '', preset: '', pick: false, tgm: false, favOnly: false, newOnly: false, shown: 60, tab: 'best', panel: false, startedAt: 0 };
+    q: '', brand: '', cat: '', preset: '', pick: false, tgm: false, favOnly: false, newOnly: false, shown: 60, tab: 'best', panel: false, startedAt: 0, diag: null, selfTest: null };
 
   // ───────────────────────── Scanner ─────────────────────────
   async function scan() {
@@ -124,12 +185,14 @@
     const jobs = P.jobs(store);
     if (!jobs.length) { toast('Pick at least one category'); return; }
     S.scanning = true; S.ctl = { stop: false }; S.done = 0; S.errors = 0; S.total = jobs.length; S.startedAt = Date.now();
+    S.diag = { ran: true, loggedOut: false, rateLimited: 0, emptyCats: [] };
     S.products.clear(); S.shown = 60; render();
     const ctl = S.ctl, queue = jobs.slice();
     const runJob = async job => {
       try {
         for (let page = 1; page <= store.depth && !ctl.stop; page++) {
           const items = await P.fetchPage(job, page, ctl);
+          if (page === 1 && !items.length && S.diag) S.diag.emptyCats.push(job.g.name + ' › ' + job.name);
           const fresh = ingest(items);
           scheduleRender();
           // Stop on the last page, or when a page adds nothing and does not promise more.
@@ -198,8 +261,14 @@
     unit: ['Unit price: low → high', (a, b) => unitVal(a) - unitVal(b)],
     name: ['Name A–Z', (a, b) => a.title.localeCompare(b.title)]
   };
+  // Comma separates OR groups; spaces inside a group are AND.
+  function matchQuery(p, q) {
+    const groups = String(q || '').trim().toLowerCase().split(',').map(g => g.trim().split(/\s+/).filter(Boolean)).filter(g => g.length);
+    if (!groups.length) return true;
+    const t = (p.title + ' ' + p.cat).toLowerCase();
+    return groups.some(g => g.every(w => t.includes(w)));
+  }
   function filtered() {
-    const q = S.q.trim().toLowerCase().split(/\s+/).filter(Boolean);
     const fav = new Set(store.favs), hid = new Set(store.hidden);
     const out = [];
     S.products.forEach(p => {
@@ -212,7 +281,7 @@
       if ((S.favOnly || S.tab === 'saved') && !fav.has(p.id)) return;
       if (S.newOnly && !p.isNew && !p.was) return;
       if (S.preset && !PRESETS[S.preset][1](p)) return;
-      if (q.length) { const t = (p.title + ' ' + p.cat).toLowerCase(); if (!q.every(w => t.includes(w))) return; }
+      if (!matchQuery(p, S.q)) return;
       out.push(p);
     });
     return out.sort(S.preset === 'value' ? SORTS.unit[1] : SORTS[store.sort][1]);
@@ -518,7 +587,7 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
   <label class="sw" style="margin-top:16px"><input type="checkbox" data-in="stockOnly" ${store.stockOnly ? 'checked' : ''}> In stock only</label>
   <label class="sw" style="margin-top:10px"><input type="checkbox" data-in="favOnly" ${S.favOnly ? 'checked' : ''}> Saved only</label>
   <label class="sw" style="margin-top:10px"><input type="checkbox" data-in="newOnly" ${S.newOnly ? 'checked' : ''}> New or price dropped</label></div>
- <div><h4>${ic('download', 15)}Export</h4><div class="chips"><button class="chip" data-act="csv">${ic('download', 14)}CSV</button><button class="chip" data-act="copyall">${ic('copy', 14)}Copy top 20</button><button class="chip" data-act="unhide">${ic('eyeoff', 14)}Unhide (${store.hidden.length})</button></div>
+ <div><h4>${ic('download', 15)}Export</h4><div class="chips"><button class="chip" data-act="csv">${ic('download', 14)}CSV</button><button class="chip" data-act="json">${ic('download', 14)}JSON</button><button class="chip" data-act="copyall">${ic('copy', 14)}Copy top 20</button><button class="chip" data-act="unhide">${ic('eyeoff', 14)}Unhide (${store.hidden.length})</button><button class="chip" data-act="selftest">${ic('check', 14)}Self-test</button></div>${S.selfTest ? `<p class="note" style="margin-top:10px">Self-test: ${S.selfTest.pass ? 'PASS' : 'FAIL'} — ${S.selfTest.got}/${S.selfTest.total} sample products parsed${S.selfTest.bad ? `, ${S.selfTest.bad} incomplete` : ''}.</p>` : ''}
   <p class="note" style="margin-top:14px"><kbd>/</kbd> search &nbsp;<kbd>S</kbd> scan &nbsp;<kbd>Esc</kbd> close</p></div>
 </aside>`;
   }
@@ -543,7 +612,20 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
       [typeof GM_xmlhttpRequest === 'function' ? true : null, 'Userscript installed', 'Optional. Recommended for reliable Telegram alerts.'],
       [tgReady() ? true : null, 'Telegram connected', 'Optional. Press Telegram in the top bar to connect your bot.']
     ];
-    return `<div class="check"><h3>Before your first ${capture ? 'capture' : 'scan'}</h3>${rows.map(([ok, t, hint]) => `<div class="ck ${ok ? 'ok' : ok === false ? 'no' : 'q'}"><span>${ic(ok ? 'check' : ok === false ? 'x' : 'info', 15)}</span><div><b>${t}</b>${!ok && hint ? `<p>${hint}</p>` : ''}</div></div>`).join('')}<button class="btn" data-act="scan" style="margin-top:16px">${ic('scan')}${capture ? 'Auto-scroll page' : 'Scan deals'}</button></div>`;
+    return `<div class="check"><h3>Before your first ${capture ? 'capture' : 'scan'}</h3>${rows.map(([ok, t, hint]) => `<div class="ck ${ok ? 'ok' : ok === false ? 'no' : 'q'}"><span>${ic(ok ? 'check' : ok === false ? 'x' : 'info', 15)}</span><div><b>${t}</b>${!ok && hint ? `<p>${hint}</p>` : ''}</div></div>`).join('')}<button class="btn" data-act="scan" style="margin-top:16px">${ic('scan')}${capture ? 'Auto-scroll page' : 'Scan deals'}</button></div>` + diagHtml();
+  }
+  // After a scan that found nothing, say why instead of showing a blank page.
+  function diagHtml() {
+    const d = S.diag;
+    if (!d || !d.ran || S.products.size) return '';
+    const rows = [];
+    if (blocked) rows.push(['BigBasket blocked this browser (HTTP 403)', 'Open bigbasket.com in this tab, set your location, wait a few seconds and scan again. Cloud servers are usually blocked — the Telegram bot needs a self-hosted runner.']);
+    else if (d.loggedOut) rows.push(['BigBasket refused the session', 'Log in on bigbasket.com, set your delivery address, then scan again.']);
+    if (d.rateLimited) rows.push([`Rate-limited ${d.rateLimited} time${d.rateLimited > 1 ? 's' : ''}`, 'BigBasket slowed the scan down. Wait a few minutes and scan again.']);
+    if (d.emptyCats.length) rows.push([`${d.emptyCats.length} categor${d.emptyCats.length > 1 ? 'ies' : 'y'} returned no products`, esc(d.emptyCats.slice(0, 3).join(' · ')) + (d.emptyCats.length > 3 ? ` · +${d.emptyCats.length - 3} more` : '') + ' — they may have no deals above your minimum discount, or the listing served a shape this version cannot read. Lower the minimum discount and try again.']);
+    if (!rows.length && S.errors) rows.push(['Some categories failed to load', 'Check your connection and scan again.']);
+    if (!rows.length) return '';
+    return `<div class="check" style="margin-top:16px"><h3>Why 0 results</h3>${rows.map(([t, hint]) => `<div class="ck no"><span>${ic('info', 15)}</span><div><b>${esc(t)}</b><p>${hint}</p></div></div>`).join('')}</div>`;
   }
   function card(p, fav, qtyMap) {
     const inList = qtyMap[p.id];
@@ -612,7 +694,7 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
     app.className = 'app' + (dark ? ' dark' : '');
     app.innerHTML = `<header><button class="ib menu-btn" data-act="side" title="Menu">${ic('menu')}</button>
  <div class="logo"><span class="mk">${ic('arrowdown', 20)}</span><div><b>PriceDrop Hunter</b><small><i class="plat">${esc(PLATFORM)}</i>${OFFSITE ? '<span class="flag">Not on store</span>' : ''}</small></div></div>
- <label class="search">${ic('search', 17)}<input data-in="q" placeholder="Search products or brands" value="${esc(S.q)}"><kbd>/</kbd></label><span class="sp"></span>
+ <label class="search">${ic('search', 17)}<input data-in="q" placeholder="Search products or brands (comma = or)" value="${esc(S.q)}"><kbd>/</kbd></label><span class="sp"></span>
  ${capture ? '' : S.scanning ? `<button class="sb stop" data-act="stop">${ic('stop', 16)}<span class="lb">Stop</span></button>` : `<button class="sb" data-act="scan">${ic('scan', 16)}<span class="lb">Scan</span></button>`}
  <button class="hb tgb" data-act="tgopen" title="Telegram alerts">${ic('send', 16)}<span class="lb">Telegram</span><span class="dot ${store.tg.on && tgReady() ? 'on' : ''}"></span></button>
  <button class="ib" data-act="theme" title="${dark ? 'Light' : 'Dark'} mode">${ic(dark ? 'sun' : 'moon')}</button>
@@ -637,6 +719,17 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
   function listText() {
     const lines = Object.entries(store.list).map(([id, q]) => { const p = S.products.get(id) || (store._cache && store._cache[id]); return p ? `- ${p.title} x${q}: ${$inr(p.price * q)}${p.url ? '\n  ' + p.url : ''}` : null; }).filter(Boolean);
     return lines.join('\n');
+  }
+  // Pure serialisers for the filtered list, shared by the CSV/JSON buttons
+  // and covered by the regression test.
+  function serialise(list) {
+    const rows = [['Title', 'Brand', 'Category', 'Price', 'MRP', 'Discount %', 'Saving', 'In stock', 'URL']].concat(list.map(p => [p.title, p.brand, p.cat, p.price, p.mrp, p.disc, p.save, p.inStock, p.url]));
+    const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n');
+    const json = JSON.stringify(list.map(p => ({ title: p.title, brand: p.brand, category: p.cat, price: p.price, mrp: p.mrp, discountPct: p.disc, saving: p.save, inStock: p.inStock, url: p.url })), null, 2);
+    return { csv, json };
+  }
+  function downloadFile(name, text, type) {
+    const a2 = document.createElement('a'); a2.href = URL.createObjectURL(new Blob([text], { type })); a2.download = name; a2.click();
   }
   // Add products from any source (scan, passive capture) with price-history flags.
   function ingest(items) {
@@ -768,11 +861,9 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
       case 'copylist': copy(listText() || 'Empty list', 'List copied'); break;
       case 'openlinks': Object.keys(store.list).map(i => S.products.get(i)).filter(p => p && p.url).forEach(p => window.open(p.url, '_blank', 'noopener')); break;
       case 'copyall': copy(filtered().slice(0, 20).map(p => `${p.disc}% off · ${p.title} · ${$inr(p.price)} (MRP ${$inr(p.mrp)})${p.url ? '\n' + p.url : ''}`).join('\n'), 'Top 20 deals copied'); break;
-      case 'csv': {
-        const rows = [['Title', 'Brand', 'Category', 'Price', 'MRP', 'Discount %', 'Saving', 'In stock', 'URL']].concat(filtered().map(p => [p.title, p.brand, p.cat, p.price, p.mrp, p.disc, p.save, p.inStock, p.url]));
-        const csv = rows.map(r => r.map(c => '"' + String(c).replace(/"/g, '""') + '"').join(',')).join('\n');
-        const a2 = document.createElement('a'); a2.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' })); a2.download = 'bigbasket-deals.csv'; a2.click(); toast('CSV downloaded'); break;
-      }
+      case 'csv': { const s2 = serialise(filtered()); downloadFile('bigbasket-deals.csv', s2.csv, 'text/csv'); toast('CSV downloaded'); break; }
+      case 'json': { const s2 = serialise(filtered()); downloadFile('bigbasket-deals.json', s2.json, 'application/json'); toast('JSON downloaded'); break; }
+      case 'selftest': { S.selfTest = selfTest(); render(); toast(S.selfTest.pass ? `Self-test PASS: ${S.selfTest.got}/${S.selfTest.total} sample products parsed` : `Self-test FAIL: ${S.selfTest.got}/${S.selfTest.total} parsed`); break; }
     }
   });
   document.addEventListener('keydown', e => {
