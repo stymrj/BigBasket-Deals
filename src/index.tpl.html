@@ -208,25 +208,25 @@ footer .h{color:var(--ac)}
     <div class="tabs" role="tablist"><button class="on" data-t="p1"><svg class="ic" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>Desktop</button><button data-t="p2"><svg class="ic" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/></svg>Mobile</button><button data-t="p3"><svg class="ic" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3h4v3a2 2 0 1 0 4 0V3h3v7h-3a2 2 0 1 0 0 4h3v7h-7v-3a2 2 0 1 0-4 0v3H3v-7h3a2 2 0 1 0 0-4H3V3h7z"/></svg>Userscript</button></div>
     <div class="panel on" id="p1"><ol>
       <li>Show the bookmarks bar: <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>B</kbd> on Windows, <kbd>⌘</kbd> <kbd>Shift</kbd> <kbd>B</kbd> on Mac.</li>
-      <li>Drag the <b>PriceDrop Hunter</b> button from the top of this page onto the bar.</li>
+      <li>Drag the <b>BigBasket Deals</b> button from the top of this page onto the bar.</li>
       <li>Open <code>bigbasket.com</code>, set your delivery location, then click the bookmark. When you close Hunter, a floating <b>Deals</b> button stays on the page to reopen it.</li>
     </ol></div>
     <div class="panel" id="p2"><ol>
-      <li>Tap <b>Copy mobile loader</b> below. It is a short bookmark that loads the latest version from this site, so it fits on any phone.</li>
+      <li>Tap <b>Copy full code</b> below. BigBasket blocks pages from loading code from other sites, so there is no short mobile loader — the button copies the full code (about 60 KB).</li>
       <li>Bookmark any page, then edit it: name it <code>PriceDrop</code> and paste the code as the address.</li>
-      <li>On <code>bigbasket.com</code>, type <code>PriceDrop</code> in the address bar and tap the bookmark.</li>
+      <li>On <code>bigbasket.com</code>, type <code>PriceDrop</code> in the address bar and tap the bookmark. If your phone cuts the code short, use the userscript tab instead.</li>
     </ol></div>
     <div class="panel" id="p3"><ol>
       <li>Install Tampermonkey or Violentmonkey.</li>
       <li>Open <a href="dist/bigbasket-deals.user.js" style="color:var(--pr);font-weight:700">this userscript link</a>. Tampermonkey shows an install screen; press <b>Install</b>.</li>
       <li>A floating <b>Deals</b> button now sits on every bigbasket.com page. Tap it to open Hunter; drag it up or down if it covers something. Recommended if you want Telegram alerts.</li>
     </ol></div>
-    <div class="code"><div class="hh"><h3>Bookmarklet code</h3><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small" id="copyloader" type="button" style="background:var(--ac);color:var(--on)"><span>Copy mobile loader</span></button><button class="btn small" id="copycode" type="button"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg><span>Copy full code</span></button></div></div><p class="note" style="color:var(--mt);font-size:14px;margin-top:8px">BigBasket blocks loading code from other sites, so both buttons copy the full code (about 45 KB). It works in Chrome on Android; if your phone cuts it short, use the userscript.</p><textarea id="code" readonly aria-label="Bookmarklet code"></textarea></div>
+    <div class="code"><div class="hh"><h3>Bookmarklet code</h3><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn small" id="copycode" type="button"><svg class="ic" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg><span>Copy full code</span></button></div></div><p class="note" style="color:var(--mt);font-size:14px;margin-top:8px">BigBasket blocks loading code from other sites, so there is no short mobile loader: the button below copies the full code (about 60 KB). It works in Chrome on Android; if your phone cuts it short, use the userscript.</p><textarea id="code" readonly aria-label="Bookmarklet code"></textarea></div>
   </div>
 </div></section>
 
 <section class="statsec"><div class="wrap"><div class="stats">
-  <div><b>14</b><span>categories covered</span></div>
+  <div><b>21</b><span>categories covered</span></div>
   <div><b>0 bytes</b><span>of your data uploaded</span></div>
   <div><b>₹0</b><span>free, no sign-up</span></div>
 </div></div></section>
@@ -262,7 +262,7 @@ footer .h{color:var(--ac)}
         <li><b>Create your bot</b><p>Open BotFather, send <code>/newbot</code> and follow the prompts. Copy the token it gives you.</p><a class="tlink" href="https://t.me/BotFather" target="_blank" rel="noopener"><svg class="ic" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/></svg>Open @BotFather</a></li>
         <li><b>Say hello to it</b><p>Open the new bot and press <b>Start</b>, so it is allowed to message you.</p></li>
         <li><b>Get your chat ID</b><p>Userinfobot replies with a number. That is your chat ID.</p><a class="tlink" href="https://t.me/userinfobot" target="_blank" rel="noopener"><svg class="ic" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3h7v7M10 14 21 3M19 14v5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h5"/></svg>Open @userinfobot</a></li>
-        <li><b>Connect Hunter</b><p>Open Hunter on bigbasket.com. Press <b>Telegram</b> in Hunter's top bar, paste the token and chat ID, press <b>Send test message</b>, then switch alerts on.</p></li>
+        <li><b>Connect Hunter</b><p>Open Hunter on bigbasket.com. Press <b>Telegram</b> in Hunter's top bar, paste the token and chat ID, press <b>Send test</b>, then switch alerts on.</p></li>
         <li><b>Scan when you want</b><p>Press Scan, pick the categories, and the new deals from that scan arrive on Telegram.</p></li>
       </ol>
       <div class="callout"><svg class="ic" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg><div><b>Use the userscript for alerts.</b> BigBasket blocks bookmarks from talking to Telegram; the userscript is allowed to. Your token is stored only in this browser.</div></div>
@@ -303,8 +303,7 @@ footer .h{color:var(--ac)}
   async function copy(msg,btn,orig,txt){txt=txt||bm;try{await navigator.clipboard.writeText(txt)}catch(_){var t=document.createElement('textarea');t.value=txt;document.body.appendChild(t);t.select();document.execCommand('copy');t.remove()}toast(msg);if(btn){var l=btn.querySelector('span')||btn;l.textContent='Copied';setTimeout(function(){l.textContent=orig},1600)}}
   document.getElementById('bm').addEventListener('click',function(e){e.preventDefault();toast('Drag this button to your bookmarks bar, then tap it on BigBasket. On a phone, use Copy the code.')});
   document.getElementById('copym').onclick=function(e){copy('Copied. Now bookmark any page and paste this as its address.',null,null,ld)};
-  document.getElementById('copy').onclick=function(){copy('Mobile loader copied. Paste it as a bookmark address.',null,null,ld)};
-  document.getElementById('copyloader').onclick=function(e){copy('Mobile loader copied',e.currentTarget,'Copy mobile loader',ld)};
+  document.getElementById('copy').onclick=function(){copy('Full code copied. Paste it as a bookmark address.',null,null,ld)};
   document.getElementById('copycode').onclick=function(e){copy('Full code copied',e.currentTarget,'Copy full code')};
   document.querySelectorAll('.tabs button').forEach(function(b){b.onclick=function(){document.querySelectorAll('.tabs button').forEach(function(x){x.classList.toggle('on',x===b)});document.querySelectorAll('.panel').forEach(function(p){p.classList.toggle('on',p.id===b.dataset.t)})}});
   var root=document.documentElement,th=document.getElementById('theme');
