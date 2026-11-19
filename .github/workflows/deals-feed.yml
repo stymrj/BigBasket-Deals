@@ -1,0 +1,67 @@
+# deals-feed.yml — publish a daily deals feed for the Telegram subscription bot.
+#
+# Runs the scanner once a day in --json mode (same scan, no Telegram send,
+# no state write) and publishes deals.json to the `feed` branch, where the
+# subscriber bot reads it at
+#   https://raw.githubusercontent.com/stymrj/BigBasket-Deals/feed/deals.json
+# Separate from telegram-bot.yml so the alert loop is untouched.
+# Schedule: 03:00 UTC = 08:30 IST; the bot fetches at ~08:45 IST and sends
+# the digest at 09:00 IST. The `feed` branch is force-pushed daily and holds
+# only deals.json — do not commit anything else to it.
+
+name: Publish daily deals feed
+
+on:
+  schedule:
+    - cron: '0 3 * * *'   # 03:00 UTC = 08:30 IST
+  workflow_dispatch:
+
+permissions:
+  contents: write   # needed to push the feed branch
+
+concurrency:
+  group: deals-feed
+  cancel-in-progress: false
+
+jobs:
+  feed:
+    # Same gate as telegram-bot.yml: set the repository variable
+    # BOT_ENABLED to "true" to let scheduled runs start.
+    if: github.event_name == 'workflow_dispatch' || vars.BOT_ENABLED == 'true'
+    runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    env:
+      BIGBASKET_COOKIE: ${{ secrets.BIGBASKET_COOKIE }}
+      MIN_DISCOUNT: ${{ vars.MIN_DISCOUNT }}
+      THRESHOLDS: ${{ vars.THRESHOLDS }}
+      GROUPS: ${{ vars.GROUPS }}
+      PAGES: ${{ vars.PAGES }}
+      MAX_WORKERS: ${{ vars.MAX_WORKERS }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Scan and emit feed JSON
+        run: node bot/run.js --json | tail -n 1 > deals.json
+
+      - name: Validate deals.json
+        run: |
+          node -e "const j=require('./deals.json'); if(!Array.isArray(j.deals)) throw new Error('no deals array'); if(typeof j.store!=='string'||typeof j.generatedAt!=='string') throw new Error('bad feed header'); console.log(j.store+': '+j.deals.length+' deals @ '+j.generatedAt)"
+
+      - name: Publish to feed branch
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git checkout -B feed
+          git add deals.json
+          if git diff --cached --quiet; then
+            echo "feed unchanged"
+          else
+            git commit -m "feed: $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+            git push origin feed --force
+          fi
