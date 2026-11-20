@@ -2,7 +2,7 @@
 
 Scans the BigBasket categories you pick through its listing API and shows the biggest discounts, then the best deals of each category. It runs in your own browser as a bookmarklet or userscript. Nothing is uploaded and there is no account.
 
-**Live page:** https://stymrj.github.io/BigBasket-Deals/
+**Live page:** http://satyamraj.in/BigBasket-Deals/
 
 ## What's new in v2 (2026-11-08)
 
@@ -51,9 +51,9 @@ Scans the BigBasket categories you pick through its listing API and shows the bi
 
 ## Install
 
-![Install walkthrough](https://stymrj.github.io/PriceDrop-Hunter/media/install-demo.gif)
+![Install walkthrough](http://satyamraj.in/PriceDrop-Hunter/media/install-demo.gif)
 
-[Watch the walkthrough video (MP4)](https://stymrj.github.io/PriceDrop-Hunter/media/install-demo.mp4)
+[Watch the walkthrough video (MP4)](http://satyamraj.in/PriceDrop-Hunter/media/install-demo.mp4)
 
 **Bookmarklet (desktop).** Run `node build.js`, open `index.html`, and drag the **BigBasket Deals** button to your bookmarks bar. Open bigbasket.com and click the bookmark.
 
