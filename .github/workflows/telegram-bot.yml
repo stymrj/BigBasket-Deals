@@ -2,7 +2,7 @@ name: Telegram deal alerts
 
 on:
   schedule:
-    - cron: '1,31 3-18 * * *'   # every 30 minutes, 08:31 to 00:01 IST
+    - cron: '1,31 3-18 * * *'   # every 30 min, 03:01-18:31 UTC = 08:31-00:01 IST (GitHub cron is UTC)
   workflow_dispatch:
     inputs:
       dry_run:
@@ -20,6 +20,8 @@ concurrency:
 jobs:
   scan:
     # Scheduled runs start only after you set the repository variable BOT_ENABLED to true.
+    # NOTE: BigBasket usually blocks GitHub-hosted runners (HTTP 403, see bot/platform.js).
+    # Set the RUNNER variable to a self-hosted runner label or expect 403s on ubuntu-latest.
     if: github.event_name == 'workflow_dispatch' || vars.BOT_ENABLED == 'true'
     runs-on: ${{ vars.RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 20
@@ -32,6 +34,8 @@ jobs:
       GROUPS: ${{ vars.GROUPS }}
       PAGES: ${{ vars.PAGES }}
       DIGEST_HOUR_IST: ${{ vars.DIGEST_HOUR_IST }}
+      MAX_WORKERS: ${{ vars.MAX_WORKERS }}
+      MAX_ALERTS: ${{ vars.MAX_ALERTS }}
       DRY_RUN: ${{ inputs.dry_run }}
     steps:
       - uses: actions/checkout@v4

@@ -10,7 +10,7 @@ Scans the BigBasket categories you pick through its listing API and shows the bi
 - **Child variants parsed on their own:** pack variants used to be merged into the parent product, inherit its id, and get silently dropped by dedupe. Each variant is now parsed separately, so a parent with two variants yields three products.
 - **Fallbacks instead of blank cards:** a product with no title keeps a title from its URL slug, a missing id falls back to title + price, a missing image falls back to the store placeholder, and a zero selling price falls back to the MRP.
 - **Unfamiliar payload shapes:** if the listing response nests products under a key the parser doesn't know, a generic walk finds product-shaped objects instead of returning nothing.
-- **Tail-discount paging:** pages are discount-sorted, so page 2 is fetched only while the previous page still ends on a discount worth showing (20%+). Depth is now 2 pages per category by default (was 1).
+- **Tail-discount paging:** pages are discount-sorted, so page 2 is fetched only while the previous page still ends on a discount worth showing (20%+). Depth is now 2 pages per category by default in the browser tool (was 1); the Telegram bot still scans 1 page per aisle by default (see `PAGES` below).
 - **Highest-discount fix (2026-11-09):** the page-end discount that decides whether page 2 is fetched is now the lowest discount among top-level products — a low-discount child variant trailing the page used to stop the scan after page 1. Prices wrapped in objects (e.g. `mrp: {value: ...}`) are now read instead of parsing as 0, and the selling price and MRP are also read from a bare `prim_price` number and from `prim_price.mrp`.
 - **One tracker per session:** the `x-tracker` header used to be a fresh random id on every request; it is now one stable id per browser session.
 - **Slower, steadier pace:** 2–2.5 seconds between listing requests (was under 2s), to stay under the rate limit that returns 403.
@@ -41,6 +41,9 @@ Scans the BigBasket categories you pick through its listing API and shows the bi
 - Unit price (per kg, litre or piece) with a value sort
 - One-tap presets: under ₹99, 50% off, save ₹100+, price drops, lowest ever, best value
 - A setup checklist on first open, plus a "Why 0 results" box after an empty scan
+- Self-test button in the sidebar: parses a built-in sample payload and reports PASS/FAIL
+- In-stock-only filter, on by default (toggle it in Settings)
+- Keyboard shortcuts: `/` search, `S` scan (or stop a running scan), `Esc` close
 - Filters: search, category, brand, maximum price, minimum discount, stock, saved items
 - Shopping list with quantities, total and total savings
 - CSV and JSON export, copy-to-share text, grid/list views, light and dark themes
@@ -54,7 +57,7 @@ Scans the BigBasket categories you pick through its listing API and shows the bi
 
 **Bookmarklet (desktop).** Run `node build.js`, open `index.html`, and drag the **BigBasket Deals** button to your bookmarks bar. Open bigbasket.com and click the bookmark.
 
-**Bookmarklet (mobile).** On the install page, tap **Copy mobile loader**. It is a bookmark of about 380 characters that loads the latest version from GitHub Pages, so it fits on any phone. Create a bookmark named **BigBasket Deals**, paste it as the address, and run it from the address bar on bigbasket.com. The full bookmarklet (about 45 KB, no network needed) is in `dist/bookmarklet.txt`.
+**Bookmarklet (mobile).** BigBasket blocks pages from loading code from other sites, so there is no short mobile loader: on the install page, tap **Copy full code** — it copies the full bookmarklet (about 60 KB, no network needed; also in `dist/bookmarklet.txt`). Create a bookmark named **BigBasket Deals**, paste it as the address, and run it from the address bar on bigbasket.com. If your phone cuts the code short, install the userscript instead.
 
 **Userscript.** Install `dist/bigbasket-deals.user.js` in Tampermonkey or Violentmonkey. A small Deals button appears on every bigbasket.com page.
 
@@ -74,7 +77,7 @@ Hunter can send new deals, price drops and cheaper saved items to your Telegram.
 3. Get your chat ID from `@userinfobot`, or open `https://api.telegram.org/bot<token>/getUpdates` and copy `chat.id`.
 4. On the store, open Hunter, press **Telegram** in the top bar, paste the token and chat ID, press **Send test**, then switch alerts on.
 
-Each deal is sent once, and again only if its price drops further. Use the userscript for alerts: some shops block bookmarklets from calling Telegram, while the userscript sends through `GM_xmlhttpRequest`. The token is stored only in your browser.
+Each deal is sent once, and again only if its price drops further. Use the userscript for alerts: BigBasket blocks bookmarklets from calling Telegram, while the userscript sends through `GM_xmlhttpRequest`. The token is stored only in your browser.
 
 ## Telegram bot (GitHub Actions)
 
@@ -122,15 +125,18 @@ Optional variables:
 | Variable | Default | What it does |
 | :--- | :--- | :--- |
 | `MIN_DISCOUNT` | per group | One threshold for every group, for example `65` |
+| `THRESHOLDS` | per group | Per-group discount thresholds, for example `staples=60,dairy=65` (group ids from `bot/config.json`) |
 | `GROUPS` | all | Only scan these groups, for example `staples,dairy` |
 | `PAGES` | `1` | Pages per aisle, 1 to 5 |
 | `DIGEST_HOUR_IST` | `9` | Hour of the morning catalogue; `-1` turns it off |
+| `MAX_WORKERS` | `2` | How many aisles the bot scans at once |
+| `MAX_ALERTS` | `40` | Most deals sent per message section (new / cheaper / back in stock) |
 | `RUNNER` | `ubuntu-latest` | Set to `self-hosted` to run on your own computer |
 
 ### Step 5: Enable and test
 
 1. Open the **Actions** tab. GitHub pauses workflows in new forks: click **I understand my workflows, go ahead and enable them**.
-2. Choose **Telegram deal alerts** → **Run workflow**, first with **Print the messages instead of sending them** ticked (dry run), then without — your first alert arrives within a minute or two.
+2. Choose **Telegram deal alerts** → **Run workflow**, first with **Print the messages instead of sending them** ticked (dry run), then without — your first alert arrives within a minute or two. On the default GitHub-hosted runner this test will usually fail with HTTP 403 (BigBasket blocks cloud servers) — that is expected; set up the self-hosted runner in Step 6 first and set `RUNNER` = `self-hosted` before testing.
 
 From then on it runs every 30 minutes by itself. GitHub sometimes starts scheduled runs late, and it pauses schedules in repositories with no activity for 60 days; re-enable them from the Actions tab if that happens.
 
@@ -161,6 +167,9 @@ A session cookie works like your password for that site. Keep it only in GitHub 
 - **Self-test fails:** the parser itself is broken for the built-in sample — check that `dist/` was rebuilt with `node build.js` after the last change, and report the FAIL line.
 - **Telegram test fails:** use the userscript version; the bookmarklet is blocked from calling Telegram on some pages.
 - **Mobile loader:** BigBasket blocks pages from loading code from other sites. Use the full bookmarklet (not the mobile loader), and the userscript for Telegram alerts.
+- **Bot never runs on schedule:** scheduled runs only start once the `BOT_ENABLED` variable is `true` (Step 4) and the workflow is enabled in the Actions tab. A manual **Run workflow** still works without it.
+- **Bot run exits 1 (no token/chat ID, or "Missing settings"):** the `TELEGRAM_BOT_TOKEN`, `TELEGRAM_CHAT_ID` or `BIGBASKET_COOKIE` secret is missing or empty — re-add it under Settings → Secrets and variables → Actions → Secrets. A dry run (`--dry-run` locally, or the dry-run tickbox on Run workflow) does not need the Telegram secrets.
+- **Bot run fails with HTTP 403:** BigBasket blocked the GitHub-hosted runner. Use a self-hosted runner (Step 6) and set `RUNNER` = `self-hosted`.
 
 ## Testing
 

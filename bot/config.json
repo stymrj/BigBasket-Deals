@@ -23,12 +23,16 @@
     },
     {
       "id": "dairy",
-      "name": "Dairy",
+      "name": "Dairy & Bakery",
       "minDiscount": 60,
       "subs": [
         [
           "dairy",
           "Dairy"
+        ],
+        [
+          "bakery-cakes-dairy",
+          "Bakery, Cakes & Dairy"
         ]
       ]
     },
@@ -114,8 +118,34 @@
           "Cleaning & Household"
         ],
         [
+          "kitchen-garden-pets",
+          "Kitchen, Garden & Pets"
+        ],
+        [
           "detergents-dishwash",
           "Detergents & Dishwash"
+        ]
+      ]
+    },
+    {
+      "id": "meat",
+      "name": "Eggs, Meat & Fish",
+      "minDiscount": 60,
+      "subs": [
+        [
+          "eggs-meat-fish",
+          "Eggs, Meat & Fish"
+        ]
+      ]
+    },
+    {
+      "id": "gourmet",
+      "name": "Gourmet",
+      "minDiscount": 70,
+      "subs": [
+        [
+          "gourmet-world-food",
+          "Gourmet & World Food"
         ]
       ]
     }
