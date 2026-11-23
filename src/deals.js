@@ -122,12 +122,14 @@
   }
   function extract(json, cat, minDisc = 20) {
     const out = [], seen = new Set(), topDiscs = [];
+    let qualifyingVariant = false;
     let items = items0(json);
     if (!items.length) items = walkProducts(json);
     for (const p of items) {
       const variants = [p].concat(p.children || []);
       for (let ci = 0; ci < variants.length; ci++) {
         const n = normalise(variants[ci], cat); // each variant parsed on its own, never merged into the parent
+        if (ci > 0 && n && n.disc >= minDisc) qualifyingVariant = true;
         if (n && !seen.has(n.id)) { seen.add(n.id); out.push(n); if (ci === 0) topDiscs.push(n.disc); }
       }
     }
@@ -137,8 +139,8 @@
     // page 1 whenever a low-discount variant trailed a page of 70-95% deals.
     out.tailDisc = topDiscs.length ? Math.min(...topDiscs) : (out.length ? Math.min(...out.map(p => p.disc)) : 0);
     out.totalFound = out.length;
-    // Pages are discount-sorted, so a low tail discount means deeper pages add nothing.
-    out.more = out.length > 0 && out.tailDisc >= minDisc;
+    // Listings sort parents by discount; qualifying variants can have lower-discount parents.
+    out.more = out.length > 0 && (out.tailDisc >= minDisc || qualifyingVariant);
     return out;
   }
   async function fetchListing(url, signal) {

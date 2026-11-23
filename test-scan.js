@@ -14,7 +14,7 @@ const product = (id, offer) => ({
   pricing: { discount: { mrp: { value: 0 }, prim_price: { mrp: 100, tracking: { mrp: 100 } } }, offer_price: { value: offer } }
 });
 
-function browser(fetch, onDelay = () => {}) {
+function browser(fetch, onDelay = () => {}, minDisc = 10) {
   const toasts = [];
   const noop = () => {};
   const scanner = src.slice(src.indexOf('  const $inr ='), src.indexOf('  // ───────────────────────── Filtering'));
@@ -24,7 +24,7 @@ function browser(fetch, onDelay = () => {}) {
       onDelay(ms);
       return setTimeout(fn, ms === 15000 ? ms : 0);
     },
-    localStorage: { getItem: () => '{"v":4,"groups":["fresh"],"minDisc":10,"depth":3}', setItem: noop },
+    localStorage: { getItem: () => JSON.stringify({ v: 4, groups: ['fresh'], minDisc, depth: 3 }), setItem: noop },
     location: { hostname: 'www.bigbasket.com' },
     render: noop, scheduleRender: noop, recordPrices: noop, notify: noop,
     toast: msg => toasts.push(msg), ingest: items => items.forEach(p => api.S.products.set(p.id, p))
@@ -71,6 +71,20 @@ test('browser recovers after HTTP 403 and pages at the selected cutoff', async (
   assert.deepEqual(requests, ['1', '1', '2']);
   assert.equal(S.products.get('1').price, 85);
   assert.equal(S.products.get('1').disc, 15);
+});
+
+test('browser continues paging when a variant meets the cutoff but the parent does not', async () => {
+  const requests = [];
+  const fixture = require('./fixtures/sample-high-discount.json');
+  const { scan, S } = browser(async url => {
+    const page = new URL(url).searchParams.get('page');
+    requests.push(page);
+    if (page === '1') return new Response(JSON.stringify(fixture));
+    return response(200, page === '2' ? [{ ...product('parent', 40), children: [product('variant', 5)] }] : []);
+  }, undefined, 90);
+  await scan();
+  assert.deepEqual(requests, ['1', '2', '3']);
+  assert.equal(S.products.get('variant').disc, 95);
 });
 
 test('Stop aborts the browser listing request and retry wait', async () => {
