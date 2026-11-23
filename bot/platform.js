@@ -8,6 +8,13 @@ let trackerVal = null;
 
 const BB_IMG_FALLBACK = 'https://www.bigbasket.com/static/images/default.jpg';
 
+const retryDelay = (header, fallback) => {
+  if (!header) return fallback;
+  if (/^\d+$/.test(header)) return Number(header) * 1000;
+  const date = Date.parse(header);
+  return Number.isFinite(date) ? Math.max(0, date - Date.now()) : fallback;
+};
+
 const items0 = j => {
   if (!j) return [];
   if (Array.isArray(j.tabs)) for (const t of j.tabs) { const l = t && t.product_info && t.product_info.products; if (l && l.length) return l; }
@@ -30,8 +37,9 @@ function normalise(p, cat, { price, brandOf }) {
   // MRP can also hide inside prim_price, and the selling price can be a
   // bare prim_price number (no .sp): both used to read as 0, leaving the
   // item with no discount (or, with no MRP at all, priced at its own MRP).
-  const mrp0 = price(dsc.mrp || (dsc.prim_price && dsc.prim_price.mrp) || pr.mrp || p.mrp);
-  const sp = price((dsc.prim_price && dsc.prim_price.sp) || dsc.prim_price || pr.offer_price || pr.sp || p.sp) || mrp0;
+  const prim = dsc.prim_price;
+  const mrp0 = price(dsc.mrp) || price(prim && prim.mrp) || price(pr.mrp) || price(p.mrp) || price(prim && prim.tracking && prim.tracking.mrp);
+  const sp = price(prim && prim.sp) || price(prim, false) || price(pr.offer_price) || price(pr.sp) || price(p.sp) || mrp0;
   const title = p.desc || p.p_desc || p.name || 'Product', w = p.w || p.pack_desc || '';
   if (!sp) return null;
   const mrp = mrp0 < sp ? sp : mrp0, av = p.availability || {}, u = p.absolute_url || '/pd/' + (p.id || '');
@@ -61,7 +69,6 @@ function extract(json, cat, ctx) {
   // page 1 whenever a low-discount variant trailed a page of 70-95% deals.
   out.tailDisc = topDiscs.length ? Math.min(...topDiscs) : (out.length ? Math.min(...out.map(p => p.disc)) : 0);
   out.totalFound = out.length;
-  out.more = out.tailDisc >= 20;
   return out;
 }
 
@@ -76,13 +83,28 @@ module.exports = {
     if (!trackerVal) trackerVal = crypto.randomUUID();
     await sleep(2000 + Math.random() * 500);
     const url = 'https://www.bigbasket.com/listing-svc/v2/products?type=pc&slug=' + encodeURIComponent(job.sub[0]) + '&page=' + page + '&sort=dphtl';
+    let lastErr;
     for (let a = 0; a < 4; a++) {
-      const r = await fetch(url, { headers: { accept: 'application/json', 'x-channel': 'BB-WEB', 'x-entry-context': 'bb-b2c', 'x-entry-context-id': '100', 'x-tracker': trackerVal, 'user-agent': UA, referer: 'https://www.bigbasket.com/', cookie: env.BIGBASKET_COOKIE } });
+      let r, json;
+      try {
+        r = await fetch(url, { signal: AbortSignal.timeout(15000), headers: { accept: 'application/json', 'x-channel': 'BB-WEB', 'x-entry-context': 'bb-b2c', 'x-entry-context-id': '100', 'x-tracker': trackerVal, 'user-agent': UA, referer: 'https://www.bigbasket.com/', cookie: env.BIGBASKET_COOKIE } });
+        if (r.ok) json = await r.json();
+      } catch (e) {
+        lastErr = e;
+        if (a < 3) await sleep(700 * (a + 1));
+        continue;
+      }
       if (r.status === 403) throw Object.assign(new Error('BigBasket blocked this machine (HTTP 403). GitHub-hosted runners are usually blocked; use a self-hosted runner and a fresh BIGBASKET_COOKIE (see README).'), { blocked: true });
-      if (r.status === 429 || r.status === 503) { const ra = +r.headers.get('retry-after'); await sleep(ra > 0 ? ra * 1000 : 4000 * (a + 1)); continue; }
-      if (!r.ok) return Object.assign([], { more: false, tailDisc: 0, totalFound: 0 });
-      return extract(await r.json(), job.g.name + ' › ' + job.sub[1], ctx);
+      if (r.status === 429 || r.status === 503) {
+        lastErr = new Error('HTTP ' + r.status);
+        const delay = retryDelay(r.headers.get('retry-after'), 4000 * (a + 1));
+        if (delay > 30000) throw lastErr;
+        if (a < 3) await sleep(delay);
+        continue;
+      }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return extract(json, job.g.name + ' › ' + job.sub[1], ctx);
     }
-    throw new Error('rate limited');
+    throw lastErr;
   }
 };

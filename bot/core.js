@@ -5,10 +5,10 @@ const fs = require('fs'), path = require('path');
 
 const ROOT = path.join(__dirname, '..');
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const price = v => {
+const price = (v, allowTrackedMrp = true) => {
   if (v == null) return 0;
   if (typeof v === 'number') return v;
-  if (typeof v === 'object') { for (const k of ['value', 'amount', 'text', 'defaultValue']) { const p = price(v[k]); if (p > 0) return p; } if (v.tracking && typeof v.tracking === 'object') { const p = price(v.tracking.fsp) || price(v.tracking.mrp); if (p > 0) return p; } return 0; }
+  if (typeof v === 'object') { for (const k of ['value', 'amount', 'text', 'defaultValue']) { const p = price(v[k], allowTrackedMrp); if (p > 0) return p; } if (v.tracking && typeof v.tracking === 'object') { const p = price(v.tracking.fsp, allowTrackedMrp) || (allowTrackedMrp ? price(v.tracking.mrp) : 0); if (p > 0) return p; } return 0; }
   const m = String(v).replace(/,/g, '').match(/\d+(\.\d+)?/);
   return m ? +m[0] : 0;
 };
@@ -98,6 +98,7 @@ async function run(platform, argv = process.argv.slice(2)) {
   const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
   const only = String(env.GROUPS || '').split(',').map(s => s.trim()).filter(Boolean);
   const per = thresholds(env), base = +env.MIN_DISCOUNT || 0;
+  const minJson = base || 50;
   const pages = Math.max(1, Math.min(5, +env.PAGES || cfg.pages || 1));
   const jobs = [];
   for (const g of cfg.groups) {
@@ -107,12 +108,12 @@ async function run(platform, argv = process.argv.slice(2)) {
   }
 
   const found = new Map();
-  let failed = 0, blocked = '';
+  let failed = 0, succeeded = 0, blocked = '';
   const ctx = { env, fetch, sleep, price, brandOf };
   await pool(jobs, +env.MAX_WORKERS || platform.workers || 4, async job => {
     for (let page = 1; page <= pages && !blocked; page++) {
       let items;
-      try { items = await platform.fetchPage(job, page, ctx); }
+      try { items = await platform.fetchPage(job, page, ctx); succeeded++; }
       catch (e) {
         if (e.blocked) blocked = e.message; else { failed++; console.log(`  ! ${job.g.name} › ${job.sub[1]}: ${e.message}`); }
         return;
@@ -124,7 +125,7 @@ async function run(platform, argv = process.argv.slice(2)) {
       // sorted listing, set by extract) — not the last array item, which
       // can be a low-discount recommendation card or child variant.
       const tail = items.tailDisc != null ? items.tailDisc : (items.length ? items[items.length - 1].disc : 0);
-      if (platform.sortedByDiscount && (items.length < (platform.pageSize || 10) || tail < job.min)) break;
+      if (platform.sortedByDiscount && (items.length < (platform.pageSize || 10) || tail < (jsonMode ? minJson : job.min))) break;
     }
   });
   if (blocked) console.error('Stopped: ' + blocked);
@@ -132,12 +133,11 @@ async function run(platform, argv = process.argv.slice(2)) {
   // --json feed mode (subscriber-bot digest): emit the top deals as one JSON
   // object and exit. No Telegram send, no state/dedupe write, no digest-date
   // gating — the feed is a snapshot of today's scan, not an alert stream.
-  // A blocked session (dead cookie) fails loudly instead of publishing a
-  // stale/empty feed. The JSON object is always the LAST stdout line; the
-  // workflow extracts it with `tail -n 1` (other console.log lines stay).
+  // A blocked or wholly failed scan must not replace the last good feed.
+  // On success the JSON object is the LAST stdout line; the workflow
+  // extracts it with `tail -n 1` (other console.log lines stay).
   if (jsonMode) {
-    if (blocked) return 1;
-    const minJson = +env.MIN_DISCOUNT || 50;
+    if (blocked || !succeeded) return 1;
     const deals = [...found.values()]
       .filter(p => p.inStock && p.disc >= minJson)
       .sort((a, b) => b.disc - a.disc || (b.mrp - b.price) - (a.mrp - a.price))

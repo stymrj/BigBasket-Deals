@@ -11,19 +11,30 @@
   // ───────────────────────── Utils ─────────────────────────
   const $inr = n => '₹' + Math.round(n).toLocaleString('en-IN');
   const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-  const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const sleep = (ms, signal) => new Promise((resolve, reject) => {
+    if (signal.aborted) { reject(signal.reason); return; }
+    const abort = () => { clearTimeout(timer); reject(signal.reason); };
+    const timer = setTimeout(() => { signal.removeEventListener('abort', abort); resolve(); }, ms);
+    signal.addEventListener('abort', abort, { once: true });
+  });
+  const retryDelay = (header, fallback) => {
+    if (!header) return fallback;
+    if (/^\d+$/.test(header)) return Number(header) * 1000;
+    const date = Date.parse(header);
+    return Number.isFinite(date) ? Math.max(0, date - Date.now()) : fallback;
+  };
   const debounce = (f, ms) => { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => f(...a), ms); }; };
 
   // Prices can arrive wrapped in an object ({value: ...} / {amount: ...} /
   // {text: "₹1,999"}), like the bot's price() already handled: reading such
   // a value as a string gave 0, so the item lost its discount or vanished
   // entirely (selling price 0 returns null from normalise).
-  const price = v => {
+  const price = (v, allowTrackedMrp = true) => {
     if (v == null) return 0;
     if (typeof v === 'number') return v;
     if (typeof v === 'object') {
-      for (const k of ['value', 'amount', 'text', 'defaultValue']) { const p = price(v[k]); if (p > 0) return p; }
-      if (v.tracking && typeof v.tracking === 'object') { const p = price(v.tracking.fsp) || price(v.tracking.mrp); if (p > 0) return p; }
+      for (const k of ['value', 'amount', 'text', 'defaultValue']) { const p = price(v[k], allowTrackedMrp); if (p > 0) return p; }
+      if (v.tracking && typeof v.tracking === 'object') { const p = price(v.tracking.fsp, allowTrackedMrp) || (allowTrackedMrp ? price(v.tracking.mrp) : 0); if (p > 0) return p; }
       return 0;
     }
     const m = String(v).replace(/,/g, '').match(/\d+(\.\d+)?/);
@@ -67,8 +78,9 @@
     // MRP can also hide inside prim_price, and the selling price can be a
     // bare prim_price number (no .sp): both used to read as 0, leaving the
     // item with no discount (or, with no MRP at all, priced at its own MRP).
-    const mrp0 = price(dsc.mrp || (dsc.prim_price && dsc.prim_price.mrp) || pr.mrp || p.mrp);
-    const sp = price((dsc.prim_price && dsc.prim_price.sp) || dsc.prim_price || pr.offer_price || pr.sp || p.sp) || mrp0;
+    const prim = dsc.prim_price;
+    const mrp0 = price(dsc.mrp) || price(prim && prim.mrp) || price(pr.mrp) || price(p.mrp) || price(prim && prim.tracking && prim.tracking.mrp);
+    const sp = price(prim && prim.sp) || price(prim, false) || price(pr.offer_price) || price(pr.sp) || price(p.sp) || mrp0;
     const title0 = p.desc || p.p_desc || p.name || 'Product', w = p.w || p.pack_desc || '';
     if (!sp) return null;
     const mrp = mrp0 < sp ? sp : mrp0;
@@ -108,14 +120,16 @@
     const bad = items.filter(p => !p.title || !p.price || !p.mrp || !p.url);
     return { total: 3, got: items.length, bad: bad.length, pass: items.length === 3 && !bad.length };
   }
-  function extract(json, cat) {
+  function extract(json, cat, minDisc = 20) {
     const out = [], seen = new Set(), topDiscs = [];
+    let qualifyingVariant = false;
     let items = items0(json);
     if (!items.length) items = walkProducts(json);
     for (const p of items) {
       const variants = [p].concat(p.children || []);
       for (let ci = 0; ci < variants.length; ci++) {
         const n = normalise(variants[ci], cat); // each variant parsed on its own, never merged into the parent
+        if (ci > 0 && n && n.disc >= minDisc) qualifyingVariant = true;
         if (n && !seen.has(n.id)) { seen.add(n.id); out.push(n); if (ci === 0) topDiscs.push(n.disc); }
       }
     }
@@ -125,26 +139,54 @@
     // page 1 whenever a low-discount variant trailed a page of 70-95% deals.
     out.tailDisc = topDiscs.length ? Math.min(...topDiscs) : (out.length ? Math.min(...out.map(p => p.disc)) : 0);
     out.totalFound = out.length;
-    // Pages are discount-sorted, so a low tail discount means deeper pages add nothing.
-    out.more = out.tailDisc >= 20;
+    // Listings sort parents by discount; qualifying variants can have lower-discount parents.
+    out.more = out.length > 0 && (out.tailDisc >= minDisc || qualifyingVariant);
     return out;
   }
-  async function fetchPage(job, page, ctl) {
-    if (blocked) throw new Error('blocked');
-    await sleep(2000 + Math.random() * 500);
+  async function fetchListing(url, signal) {
+    if (signal.aborted) throw signal.reason;
+    const request = new AbortController();
+    const abort = () => request.abort(signal.reason);
+    signal.addEventListener('abort', abort, { once: true });
+    const timer = setTimeout(() => request.abort(new Error('request timed out')), 15000);
+    try {
+      const r = await W.fetch(url, { signal: request.signal, credentials: 'include', headers: { accept: 'application/json', 'x-channel': 'BB-WEB', 'x-entry-context': 'bb-b2c', 'x-entry-context-id': '100', 'x-tracker': tracker() } });
+      return { r, json: r.ok ? await r.json() : null };
+    } finally {
+      clearTimeout(timer);
+      signal.removeEventListener('abort', abort);
+    }
+  }
+  async function fetchPage(job, page, ctl, minDisc) {
+    const signal = ctl.signal;
+    await sleep(2000 + Math.random() * 500, signal);
     const url = 'https://www.bigbasket.com/listing-svc/v2/products?type=pc&slug=' + encodeURIComponent(job.slug) + '&page=' + page + '&sort=dphtl';
     let lastErr;
     for (let a = 0; a < 4; a++) {
-      if (ctl.stop) throw new Error('stopped');
+      let pageData;
       try {
-        const r = await W.fetch(url, { credentials: 'include', headers: { accept: 'application/json', 'x-channel': 'BB-WEB', 'x-entry-context': 'bb-b2c', 'x-entry-context-id': '100', 'x-tracker': tracker() } });
-        if (r.status === 403) { blocked = true; ctl.stop = true; if (S.diag) S.diag.loggedOut = true; throw new Error('blocked'); }
-        if (r.status === 429 || r.status === 503) { if (S.diag) S.diag.rateLimited++; const ra = +r.headers.get('retry-after'); await sleep((ra > 0 ? ra * 1000 : 3000 * (a + 1))); continue; }
-        if (!r.ok) return Object.assign([], { more: false, tailDisc: 0, totalFound: 0 });
-        return extract(await r.json(), job.g.name + ' › ' + job.name);
-      } catch (e) { if (blocked) throw e; lastErr = e; await sleep(700 * (a + 1)); }
+        pageData = await fetchListing(url, signal);
+      } catch (e) {
+        if (signal.aborted) throw signal.reason;
+        lastErr = e;
+        if (a < 3) await sleep(700 * (a + 1), signal);
+        continue;
+      }
+      if (signal.aborted) throw signal.reason;
+      const { r, json } = pageData;
+      if (r.status === 403) { blocked = true; stopScan(); throw new Error('blocked'); }
+      if (r.status === 429 || r.status === 503) {
+        S.diag.rateLimited++;
+        lastErr = new Error('HTTP ' + r.status);
+        const delay = retryDelay(r.headers.get('retry-after'), 3000 * (a + 1));
+        if (delay > 30000) throw lastErr;
+        if (a < 3) await sleep(delay, signal);
+        continue;
+      }
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      return extract(json, job.g.name + ' › ' + job.name, minDisc);
     }
-    throw lastErr || new Error('rate limited');
+    throw lastErr;
   }
   const P = {
     key: 'bbd_v1', hostRe: /(^|\.)bigbasket\.com$/,
@@ -174,43 +216,47 @@
   if (store.v !== 4) { store.groups = GROUPS.map(g => g.id); store.sort = 'disc'; store.depth = (typeof P !== 'undefined' && P.defaults && P.defaults.depth) || 2; store.v = 4; save(); }
 
   // ───────────────────────── State ─────────────────────────
-  const S = { products: new Map(), scanning: false, done: 0, total: 0, errors: 0, ctl: { stop: false },
+  const S = { products: new Map(), scanning: false, done: 0, total: 0, errors: 0, ctl: null,
     q: '', brand: '', cat: '', preset: '', pick: false, tgm: false, favOnly: false, newOnly: false, shown: 60, tab: 'best', panel: false, startedAt: 0, diag: null, selfTest: null };
 
   // ───────────────────────── Scanner ─────────────────────────
+  function stopScan() { if (S.scanning) S.ctl.abort(); }
   async function scan() {
     if (S.scanning) return;
     if (OFFSITE) { toast('Open ' + PLATFORM + ' to fetch live deals.'); return; }
     if (typeof captureUI === 'function') { autoScroll(); return; }
     const jobs = P.jobs(store);
     if (!jobs.length) { toast('Pick at least one category'); return; }
-    S.scanning = true; S.ctl = { stop: false }; S.done = 0; S.errors = 0; S.total = jobs.length; S.startedAt = Date.now();
-    S.diag = { ran: true, loggedOut: false, rateLimited: 0, emptyCats: [] };
+    blocked = false;
+    S.scanning = true; S.ctl = new AbortController(); S.done = 0; S.errors = 0; S.total = jobs.length; S.startedAt = Date.now();
+    S.diag = { ran: true, rateLimited: 0, emptyCats: [] };
     S.products.clear(); S.shown = 60; render();
     const ctl = S.ctl, queue = jobs.slice();
+    const alerts = store.tg.on && tgReady();
+    const minDisc = alerts ? Math.min(store.minDisc, store.tg.drops || store.tg.watch ? 0 : store.tg.minDisc) : store.minDisc;
     const runJob = async job => {
       try {
-        for (let page = 1; page <= store.depth && !ctl.stop; page++) {
-          const items = await P.fetchPage(job, page, ctl);
+        for (let page = 1; page <= store.depth && !ctl.signal.aborted; page++) {
+          const items = await P.fetchPage(job, page, ctl, minDisc);
           if (page === 1 && !items.length && S.diag) S.diag.emptyCats.push(job.g.name + ' › ' + job.name);
           const fresh = ingest(items);
           scheduleRender();
           // Stop on the last page, or when a page adds nothing and does not promise more.
           if (items.more === false || (!fresh && items.more !== true)) break;
         }
-      } catch (e) { if (!ctl.stop) S.errors++; }
+      } catch (e) { if (!ctl.signal.aborted) S.errors++; }
       S.done++; scheduleRender();
     };
     // The first request finds the right data centre; then the workers run in parallel.
     if (queue.length) await runJob(queue.shift());
-    const worker = async () => { while (queue.length && !ctl.stop) await runJob(queue.shift()); };
+    const worker = async () => { while (queue.length && !ctl.signal.aborted) await runJob(queue.shift()); };
     await Promise.all(Array.from({ length: (typeof P !== 'undefined' && P.workers) || 4 }, worker));
     S.scanning = false;
     recordPrices();
     store.lastScan = Date.now(); save(); render();
     notify();
-    if (P.noLocation() && !S.products.size) { toast(P.noLocMsg); return; }
-    toast(ctl.stop ? 'Scan stopped' : `Scan complete · ${S.products.size} products` + (S.errors ? ` · ${S.errors} failed` : ''));
+    if (P.noLocation()) { toast(P.noLocMsg); return; }
+    toast(ctl.signal.aborted ? 'Scan stopped' : `Scan complete · ${S.products.size} products` + (S.errors ? ` · ${S.errors} failed` : ''));
   }
 
   // ───────────────────────── Filtering ─────────────────────────
@@ -265,7 +311,7 @@
   function matchQuery(p, q) {
     const groups = String(q || '').trim().toLowerCase().split(',').map(g => g.trim().split(/\s+/).filter(Boolean)).filter(g => g.length);
     if (!groups.length) return true;
-    const t = (p.title + ' ' + p.cat).toLowerCase();
+    const t = (p.title + ' ' + (p.brand || '') + ' ' + p.cat).toLowerCase();
     return groups.some(g => g.every(w => t.includes(w)));
   }
   function filtered() {
@@ -620,7 +666,6 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
     if (!d || !d.ran || S.products.size) return '';
     const rows = [];
     if (blocked) rows.push(['BigBasket blocked this browser (HTTP 403)', 'Open bigbasket.com in this tab, set your location, wait a few seconds and scan again. Cloud servers are usually blocked — the Telegram bot needs a self-hosted runner.']);
-    else if (d.loggedOut) rows.push(['BigBasket refused the session', 'Log in on bigbasket.com, set your delivery address, then scan again.']);
     if (d.rateLimited) rows.push([`Rate-limited ${d.rateLimited} time${d.rateLimited > 1 ? 's' : ''}`, 'BigBasket slowed the scan down. Wait a few minutes and scan again.']);
     if (d.emptyCats.length) rows.push([`${d.emptyCats.length} categor${d.emptyCats.length > 1 ? 'ies' : 'y'} returned no products`, esc(d.emptyCats.slice(0, 3).join(' · ')) + (d.emptyCats.length > 3 ? ` · +${d.emptyCats.length - 3} more` : '') + ' — they may have no deals above your minimum discount, or the listing served a shape this version cannot read. Lower the minimum discount and try again.']);
     if (!rows.length && S.errors) rows.push(['Some categories failed to load', 'Check your connection and scan again.']);
@@ -675,11 +720,25 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
     }
     return `<main id="main">${head}${body}</main>`;
   }
+  function listItems() {
+    return Object.entries(store.list).map(([id, q]) => [S.products.get(id) || (store._cache && store._cache[id]), q]).filter(([p]) => p);
+  }
+  function openListLinks() {
+    let blockedTabs = 0;
+    for (const [p] of listItems()) {
+      if (!p.url) continue;
+      const tab = window.open('about:blank', '_blank');
+      if (!tab) { blockedTabs++; continue; }
+      tab.opener = null;
+      tab.location.replace(p.url);
+    }
+    if (blockedTabs) toast(`Browser blocked ${blockedTabs} tab${blockedTabs === 1 ? '' : 's'} — allow popups or click items individually`);
+  }
   function drawer() {
-    const items = Object.entries(store.list).map(([id, q]) => [S.products.get(id) || store._cache && store._cache[id], q]).filter(x => x[0]);
+    const items = listItems();
     const tot = items.reduce((s, [p, q]) => s + p.price * q, 0), mrp = items.reduce((s, [p, q]) => s + p.mrp * q, 0);
     return `<div class="drawer ${S.panel ? 'open' : ''}"><header><b>${ic('bag', 20)}Shopping list</b><button class="hb" data-act="clearlist">Clear</button><button class="ib" data-act="closepanel" title="Close">${ic('x')}</button></header>
- <div class="dl">${items.length ? items.map(([p, q]) => `<div class="li"><img src="${esc(p.img)}" alt=""><div><a class="ti">${esc(p.title)}</a><b>${$inr(p.price * q)}</b><s>${$inr(p.mrp * q)}</s></div><div class="qty"><button data-act="dec" data-id="${esc(p.id)}">−</button>${q}<button data-act="inc" data-id="${esc(p.id)}">+</button></div></div>`).join('') : `<div class="empty"><span class="ei">${ic('bag', 26)}</span><b>Your list is empty</b>Tap “Add to list” on any deal.</div>`}</div>
+ <div class="dl">${items.length ? items.map(([p, q]) => `<div class="li"><img src="${esc(p.img)}" alt=""><div>${p.url ? `<a class="ti" href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a>` : `<span class="ti">${esc(p.title)}</span>`}<b>${$inr(p.price * q)}</b><s>${$inr(p.mrp * q)}</s></div><div class="qty"><button data-act="dec" data-id="${esc(p.id)}">−</button>${q}<button data-act="inc" data-id="${esc(p.id)}">+</button></div></div>`).join('') : `<div class="empty"><span class="ei">${ic('bag', 26)}</span><b>Your list is empty</b>Tap “Add to list” on any deal.</div>`}</div>
  <div class="df"><div class="row"><span class="note">Total</span><span class="tot">${$inr(tot)}</span></div><div class="row"><span class="note">You save</span><b style="color:var(--ok);font-size:16px">${$inr(mrp - tot)}</b></div>
  <div class="row" style="gap:10px;margin-top:4px"><button class="btn ghost" style="flex:1" data-act="copylist">${ic('copy', 16)}Copy list</button><button class="btn" style="flex:1;height:40px;font-size:14px" data-act="openlinks">${ic('ext', 16)}Open all</button></div></div></div>`;
   }
@@ -717,7 +776,7 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
     catch (e) { const ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); toast(msg || 'Copied'); }
   }
   function listText() {
-    const lines = Object.entries(store.list).map(([id, q]) => { const p = S.products.get(id) || (store._cache && store._cache[id]); return p ? `- ${p.title} x${q}: ${$inr(p.price * q)}${p.url ? '\n  ' + p.url : ''}` : null; }).filter(Boolean);
+    const lines = listItems().map(([p, q]) => `- ${p.title} x${q}: ${$inr(p.price * q)}${p.url ? '\n  ' + p.url : ''}`);
     return lines.join('\n');
   }
   // Pure serialisers for the filtered list, shared by the CSV/JSON buttons
@@ -838,7 +897,7 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
       case 'scan': openPicker(); break;
       case 'pstart': if (!store.groups.length) { toast('Pick at least one category'); break; } S.pick = false; render(); scan(); break;
       case 'pclose': S.pick = false; render(); break;
-      case 'stop': S.ctl.stop = true; toast('Stopping…'); break;
+      case 'stop': stopScan(); toast('Stopping…'); break;
       case 'autoscroll': if (typeof autoScroll === 'function') autoScroll(); break;
       case 'tgtest': tgTest(); break;
       case 'bell': case 'tgopen': sideOpen = false; S.pick = false; S.tgm = true; render(); break;
@@ -859,7 +918,7 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
       case 'dec': if (--store.list[id] <= 0) delete store.list[id]; save(); render(); break;
       case 'clearlist': store.list = {}; save(); render(); break;
       case 'copylist': copy(listText() || 'Empty list', 'List copied'); break;
-      case 'openlinks': Object.keys(store.list).map(i => S.products.get(i)).filter(p => p && p.url).forEach(p => window.open(p.url, '_blank', 'noopener')); break;
+      case 'openlinks': openListLinks(); break;
       case 'copyall': copy(filtered().slice(0, 20).map(p => `${p.disc}% off · ${p.title} · ${$inr(p.price)} (MRP ${$inr(p.mrp)})${p.url ? '\n' + p.url : ''}`).join('\n'), 'Top 20 deals copied'); break;
       case 'csv': { const s2 = serialise(filtered()); downloadFile('bigbasket-deals.csv', s2.csv, 'text/csv'); toast('CSV downloaded'); break; }
       case 'json': { const s2 = serialise(filtered()); downloadFile('bigbasket-deals.json', s2.json, 'application/json'); toast('JSON downloaded'); break; }
@@ -873,7 +932,7 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
     else if (e.key === 'Escape') { if (S.panel) { S.panel = false; render(); } else if (typing) root.activeElement.blur(); else api.hide(); }
     else if (!typing && !e.metaKey && !e.ctrlKey) {
       if (e.key === '/') { e.preventDefault(); const i = root.querySelector('[data-in=q]'); i && i.focus(); }
-      else if (e.key.toLowerCase() === 's') S.scanning ? (S.ctl.stop = true) : openPicker();
+      else if (e.key.toLowerCase() === 's') S.scanning ? stopScan() : openPicker();
     }
     if (!typing || e.key === 'Escape') e.stopPropagation();
   }, true);
