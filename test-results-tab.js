@@ -27,6 +27,7 @@ eval(slice('  const price = ', '  async function fetchPage', 'parser'));
 // itself: capture the comparator expression instead of the declaration.
 const byDisc = eval(slice('  const byDisc = ', '  function bestView', 'byDisc').replace(/^\s*const byDisc =\s*/, '').replace(/;\s*$/, ''));
 eval(slice('  function card(p, fav, qtyMap) {', '  const byDisc = ', 'card'));
+eval(slice('  function listItems() {', '  function render() {', 'shopping list'));
 eval(slice('  function listText() {', '  // Add products from any source', 'serialise'));
 eval(slice('  // Comma separates OR groups', '  function filtered() {', 'matchQuery'));
 
@@ -100,6 +101,14 @@ check('search: single word matches', matchQuery(salt, 'salt') === true);
 check('search: comma is OR', matchQuery(salt, 'rice, salt') === true);
 check('search: spaces are AND', matchQuery(salt, 'salt rice') === false);
 check('search: empty query matches all', matchQuery(salt, '') === true);
+const brandOnly = { title: 'Iodised Salt · 1 kg', brand: 'Tata', cat: 'Staples' };
+check('search: brand metadata matches without appearing in the title', matchQuery(brandOnly, 'tata salt') === true);
+
+const cached = items[0];
+const store = { list: { [cached.id]: 2 }, _cache: { [cached.id]: cached } };
+const S = { products: new Map(), panel: true };
+check('shopping list: cached items remain available without a current scan', listItems()[0][0] === cached);
+check('shopping list: cached item links work in the drawer and copied list', drawer().includes(`href="${esc(cached.url)}"`) && listText().includes(cached.url));
 
 if (failures) { console.log('FAIL: ' + failures + ' check(s) failed'); process.exit(1); }
 console.log('PASS: all 9 cards render');
