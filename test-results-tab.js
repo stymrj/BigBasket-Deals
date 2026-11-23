@@ -110,5 +110,16 @@ const S = { products: new Map(), panel: true };
 check('shopping list: cached items remain available without a current scan', listItems()[0][0] === cached);
 check('shopping list: cached item links work in the drawer and copied list', drawer().includes(`href="${esc(cached.url)}"`) && listText().includes(cached.url));
 
+for (const p of items.slice(1, 3)) { store.list[p.id] = 1; store._cache[p.id] = p; }
+let opened = 0, popupHint = '', destination;
+const toast = msg => { popupHint = msg; };
+const window = { open(...args) {
+  if (args.join() !== 'about:blank,_blank' || opened++) return null;
+  return { opener: window, location: { replace(url) { destination = url; } } };
+} };
+openListLinks();
+check('shopping list: Open all navigates successful tabs', destination === cached.url);
+check('shopping list: Open all reports blocked tabs', popupHint === 'Browser blocked 2 tabs — allow popups or click items individually');
+
 if (failures) { console.log('FAIL: ' + failures + ' check(s) failed'); process.exit(1); }
 console.log('PASS: all 9 cards render');

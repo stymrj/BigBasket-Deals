@@ -723,6 +723,17 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
   function listItems() {
     return Object.entries(store.list).map(([id, q]) => [S.products.get(id) || (store._cache && store._cache[id]), q]).filter(([p]) => p);
   }
+  function openListLinks() {
+    let blockedTabs = 0;
+    for (const [p] of listItems()) {
+      if (!p.url) continue;
+      const tab = window.open('about:blank', '_blank');
+      if (!tab) { blockedTabs++; continue; }
+      tab.opener = null;
+      tab.location.replace(p.url);
+    }
+    if (blockedTabs) toast(`Browser blocked ${blockedTabs} tab${blockedTabs === 1 ? '' : 's'} — allow popups or click items individually`);
+  }
   function drawer() {
     const items = listItems();
     const tot = items.reduce((s, [p, q]) => s + p.price * q, 0), mrp = items.reduce((s, [p, q]) => s + p.mrp * q, 0);
@@ -907,7 +918,7 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
       case 'dec': if (--store.list[id] <= 0) delete store.list[id]; save(); render(); break;
       case 'clearlist': store.list = {}; save(); render(); break;
       case 'copylist': copy(listText() || 'Empty list', 'List copied'); break;
-      case 'openlinks': listItems().forEach(([p]) => { if (p.url) window.open(p.url, '_blank', 'noopener'); }); break;
+      case 'openlinks': openListLinks(); break;
       case 'copyall': copy(filtered().slice(0, 20).map(p => `${p.disc}% off · ${p.title} · ${$inr(p.price)} (MRP ${$inr(p.mrp)})${p.url ? '\n' + p.url : ''}`).join('\n'), 'Top 20 deals copied'); break;
       case 'csv': { const s2 = serialise(filtered()); downloadFile('bigbasket-deals.csv', s2.csv, 'text/csv'); toast('CSV downloaded'); break; }
       case 'json': { const s2 = serialise(filtered()); downloadFile('bigbasket-deals.json', s2.json, 'application/json'); toast('JSON downloaded'); break; }
