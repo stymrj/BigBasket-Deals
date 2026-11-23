@@ -4,7 +4,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 const vm = require('node:vm');
-const { run } = require('./bot/core');
+const { run, price, brandOf } = require('./bot/core');
 const platform = require('./bot/platform');
 
 const src = fs.readFileSync(path.join(__dirname, 'src', 'deals.js'), 'utf8');
@@ -85,6 +85,26 @@ test('browser continues paging when a variant meets the cutoff but the parent do
   await scan();
   assert.deepEqual(requests, ['1', '2', '3']);
   assert.equal(S.products.get('variant').disc, 95);
+});
+
+test('browser and bot use tracked MRP without masking an offer price', async () => {
+  const discount = { prim_price: { tracking: { mrp: 100 } } };
+  const products = [
+    { id: 'no-offer', desc: 'No offer', pricing: { discount } },
+    { id: 'offer', desc: 'Has offer', pricing: { discount, offer_price: 40 } }
+  ];
+  const fetch = async () => response(200, products);
+  const { scan, S } = browser(fetch);
+  await scan();
+  const bot = await platform.fetchPage({ g: { name: 'Test' }, sub: ['test', 'Test'] }, 1, {
+    env: {}, fetch, sleep: async () => {}, price, brandOf
+  });
+  for (const items of [[...S.products.values()], Array.from(bot)]) {
+    assert.deepEqual(items.map(p => [p.id, p.price, p.mrp, p.disc]), [
+      ['no-offer', 100, 100, 0],
+      ['offer', 40, 100, 60]
+    ]);
+  }
 });
 
 test('Stop aborts the browser listing request and retry wait', async () => {

@@ -38,7 +38,7 @@ function normalise(p, cat, { price, brandOf }) {
   // bare prim_price number (no .sp): both used to read as 0, leaving the
   // item with no discount (or, with no MRP at all, priced at its own MRP).
   const prim = dsc.prim_price;
-  const mrp0 = price(dsc.mrp) || price(prim && prim.mrp) || price(pr.mrp) || price(p.mrp);
+  const mrp0 = price(dsc.mrp) || price(prim && prim.mrp) || price(pr.mrp) || price(p.mrp) || price(prim && prim.tracking && prim.tracking.mrp);
   const sp = price(prim && prim.sp) || price(prim, false) || price(pr.offer_price) || price(pr.sp) || price(p.sp) || mrp0;
   const title = p.desc || p.p_desc || p.name || 'Product', w = p.w || p.pack_desc || '';
   if (!sp) return null;
