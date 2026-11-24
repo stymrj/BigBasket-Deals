@@ -104,6 +104,39 @@ check('search: empty query matches all', matchQuery(salt, '') === true);
 const brandOnly = { title: 'Iodised Salt · 1 kg', brand: 'Tata', cat: 'Staples' };
 check('search: brand metadata matches without appearing in the title', matchQuery(brandOnly, 'tata salt') === true);
 
+const prefs = { favs: [], hidden: [], stock: '', minDisc: 0, maxPrice: 0, sort: 'disc' };
+const filters = { products: new Map(), tab: 'best' };
+const { unitOf, filtered } = new Function('store', 'S', 'byDisc',
+  slice('  const UNITS = ', '  // ───────────────────────── UI', 'deal filters') + '\nreturn { unitOf, filtered };'
+)(prefs, filters, byDisc);
+const filterItems = extract({ products: [
+  { id: 'a', name: 'Everyday Atta', brand: { name: 'Farm Fresh' }, w: '2 × 500 g', sp: 100, mrp: 200 },
+  { id: 'b', name: 'Whole Wheat Atta', brand: { name: 'Farm Fresh' }, pack_desc: '500 g', sp: 50, mrp: 250, availability: { avail_status: '002' } },
+  { id: 'c', name: 'Semolina', brand: { name: 'Farm Fresh' }, w: '1 kg', sp: 80, mrp: 200 }
+] }, 'Staples & Oil › Foodgrains').concat(extract({ products: [
+  { id: 'd', name: 'Orange Juice', brand: { name: 'Juicy' }, w: '1 L', sp: 49, mrp: 100 },
+  { id: 'e', name: 'Juice Box', brand: { name: 'Juicy' }, w: '200 ml x 4', sp: 40, mrp: 100 },
+  { id: 'f', name: 'Snack', sp: 99.99, mrp: 200 }
+] }, 'Beverages › Beverages'));
+for (const p of filterItems) { p.unit = unitOf(p.pack); filters.products.set(p.id, p); }
+const ids = () => filtered().map(p => p.id).join(',');
+check('filters: pack labels and both multipack formats use API pack metadata',
+  filterItems[1].pack === '500 g' && filterItems[0].unit.qty === 1 && filterItems[4].unit.qty === .8);
+Object.assign(filters, { cat: 'Staples & Oil', brand: 'Farm Fresh', unit: 'kg', pack: '2 × 500 g', priceBand: 'under250' });
+Object.assign(prefs, { minDisc: 50, stock: 'in' });
+check('filters: category, brand, unit, pack, price, discount and stock compose on Best deals', ids() === 'a');
+Object.assign(filters, { pack: '', priceBand: 'under100' });
+check('filters: exact ₹100 goes in the next price band', ids() === 'c');
+prefs.stock = 'out';
+check('filters: out-of-stock groceries can be shown on their own', ids() === 'b');
+Object.assign(prefs, { stock: '', minDisc: 0, sort: 'unit' });
+Object.assign(filters, { cat: '', brand: '', unit: '', priceBand: '' });
+check('filters: unit-price sort compares only like units and puts unknown packs last', ids() === 'c,a,b,d,e,f');
+Object.assign(filters, { priceBand: 'under100', unit: 'L' });
+check('filters: unit-price sort can be narrowed to liquid packs', ids() === 'd,e');
+Object.assign(filters, { priceBand: 'under100', unit: '' });
+check('filters: fractional prices below a band boundary remain included', ids().split(',').includes('f'));
+
 const cached = items[0];
 const store = { list: { [cached.id]: 2 }, _cache: { [cached.id]: cached } };
 const S = { products: new Map(), panel: true };

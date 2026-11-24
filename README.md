@@ -38,13 +38,13 @@ Scans the BigBasket categories you pick through its listing API and shows the bi
 - Labels products that are new, cheaper than last time, or at their lowest price ever
 - Price history sparkline on every product you have seen before
 - Saved items strip showing how much each one dropped since you saved it
-- Unit price (per kg, litre or piece) with a value sort
-- One-tap presets: under ₹99, 50% off, save ₹100+, price drops, lowest ever, best value
+- Unit price (per kg, litre or piece) with sorting within each unit, so weights and volumes are ranked separately
+- Quick discount thresholds, plus one-tap filters for ₹100+ savings, price drops and lowest-ever prices
 - A setup checklist on first open, plus a "Why 0 results" box after an empty scan
 - Self-test button in the sidebar: parses a built-in sample payload and reports PASS/FAIL
-- In-stock-only filter, on by default (toggle it in Settings)
+- Stock filter: in stock (default), out of stock, or any stock
 - Keyboard shortcuts: `/` search, `S` scan (or stop a running scan), `Esc` close
-- Filters: search, category, brand, maximum price, minimum discount, stock, saved items
+- Filter the scanned catalogue by category, brand, pack size, comparable unit, price band and stock. Open Tools and settings for a custom price cap, discount threshold and saved-only filter.
 - Shopping list with quantities, total and total savings
 - CSV and JSON export, copy-to-share text, grid/list views, light and dark themes
 - Settings, saved items and price history stay in your browser
@@ -173,7 +173,7 @@ A session cookie works like your password for that site. Keep it only in GitHub 
 
 ## Testing
 
-Run `node test-results-tab.js` (sample listing-svc payload: 9 products incl. 2 child variants, parser -> real card() render) and `node build.js` to rebuild `dist/` and `index.html`.
+Run `node build.js` to rebuild `dist/` and `index.html`, then run `node test-results-tab.js && node test-bookmark-name.js && node test-scan.js`.
 
 The regression test asserts 9 parsed products render 9 cards, plus the strict stock rules, child-variant parsing, image/id fallbacks, the generic-walk fallback, the self-test, CSV/JSON export and multi-keyword search. Live BigBasket results still need a manual browser test: the API cannot be fully verified from a machine without a logged-in BigBasket session, and BigBasket blocks most cloud servers.
 
