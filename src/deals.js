@@ -805,7 +805,8 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
     const dark = store.theme === 'dark' || (store.theme === 'auto' && matchMedia('(prefers-color-scheme:dark)').matches);
     const keepScroll = (root.getElementById('main') || {}).scrollTop || 0;
     const sideScroll = (root.querySelector('aside') || {}).scrollTop || 0;
-    const focused = root.activeElement && root.activeElement.dataset ? root.activeElement.dataset.in : null;
+    const active = root.activeElement;
+    const focused = active?.dataset?.in;
     const count = Object.values(store.list).reduce((a, b) => a + b, 0);
     const pct = S.total ? Math.round(S.done / S.total * 100) : 0;
     const capture = typeof captureUI === 'function' && !OFFSITE;
@@ -823,6 +824,7 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
     const m = root.getElementById('main'); if (m) m.scrollTop = keepScroll;
     const a = root.querySelector('aside'); if (a) a.scrollTop = sideScroll;
     if (focused === 'q') { const i = root.querySelector('[data-in=q]'); i.focus(); i.setSelectionRange(i.value.length, i.value.length); }
+    else if (active?.tagName === 'SELECT' && focused) root.querySelector(`select[data-in="${focused}"]`)?.focus({ preventScroll: true });
   }
   let rq = 0;
   const scheduleRender = () => { if (rq) return; rq = setTimeout(() => { rq = 0; render(); }, 250); };

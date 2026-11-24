@@ -156,6 +156,25 @@ handlers.change({ target: { dataset: { in: 'cat' }, value: 'Beverages' } });
 click('tab', { v: 'best' });
 check('filters: an explicit category overrides See all and persists across tabs', ids() === 'd,e,f');
 
+const initialSelect = { tagName: 'SELECT', dataset: { in: 'stock' } };
+let replacement;
+const renderRoot = {
+  activeElement: initialSelect,
+  getElementById() { return null; },
+  querySelector(sel) { return sel === 'select[data-in="stock"]' ? replacement : null; }
+};
+const renderApp = {
+  set innerHTML(value) {
+    renderRoot.activeElement = null;
+    replacement = { focus() { renderRoot.activeElement = this; } };
+  }
+};
+const empty = () => '';
+new Function('root', 'app', 'store', 'S', 'esc', 'PLATFORM', 'OFFSITE', 'ic', 'sideOpen', 'sidebar', 'mainView', 'drawer',
+  slice('  function render() {', '  let rq =', 'render focus') + '\nrender();'
+)(renderRoot, renderApp, { theme: 'light', list: {}, tg: {} }, {}, esc, 'BigBasket', false, ic, false, empty, empty, empty);
+check('filters: a render restores focus to the replacement dropdown', renderRoot.activeElement === replacement);
+
 const cached = items[0];
 const store = { list: { [cached.id]: 2 }, _cache: { [cached.id]: cached } };
 const S = { products: new Map(), panel: true };
