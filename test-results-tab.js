@@ -106,8 +106,8 @@ check('search: brand metadata matches without appearing in the title', matchQuer
 
 const prefs = { favs: [], hidden: [], stock: '', minDisc: 0, maxPrice: 0, sort: 'disc' };
 const filters = { products: new Map(), tab: 'best' };
-const { unitOf, filtered } = new Function('store', 'S', 'byDisc',
-  slice('  const UNITS = ', '  // ───────────────────────── UI', 'deal filters') + '\nreturn { unitOf, filtered };'
+const { unitOf, filtered, SORTS } = new Function('store', 'S', 'byDisc',
+  slice('  const UNITS = ', '  // ───────────────────────── UI', 'deal filters') + '\nreturn { unitOf, filtered, SORTS };'
 )(prefs, filters, byDisc);
 const filterItems = extract({ products: [
   { id: 'a', name: 'Everyday Atta', brand: { name: 'Farm Fresh' }, w: '2 × 500 g', sp: 100, mrp: 200 },
@@ -132,6 +132,7 @@ check('filters: out-of-stock groceries can be shown on their own', ids() === 'b'
 Object.assign(prefs, { stock: '', minDisc: 0, sort: 'unit' });
 Object.assign(filters, { cat: '', brand: '', unit: '', priceBand: '' });
 check('filters: unit-price sort compares only like units and puts unknown packs last', ids() === 'c,a,b,d,e,f');
+check('filters: unit-price sort has a compact label', SORTS.unit[0] === 'Unit price');
 Object.assign(filters, { priceBand: 'under100', unit: 'L' });
 check('filters: unit-price sort can be narrowed to liquid packs', ids() === 'd,e');
 Object.assign(filters, { priceBand: 'under100', unit: '' });

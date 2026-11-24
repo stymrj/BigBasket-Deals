@@ -319,7 +319,7 @@
     save: ['Biggest saving ₹', (a, b) => b.save - a.save],
     pasc: ['Price: low → high', (a, b) => a.price - b.price],
     pdesc: ['Price: high → low', (a, b) => b.price - a.price],
-    unit: ['Unit price by unit', compareUnitPrice],
+    unit: ['Unit price', compareUnitPrice],
     name: ['Name A–Z', (a, b) => a.title.localeCompare(b.title)]
   };
   // Comma separates OR groups; spaces inside a group are AND.
