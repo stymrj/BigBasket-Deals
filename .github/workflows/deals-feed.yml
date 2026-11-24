@@ -34,6 +34,7 @@ jobs:
     steps:
       - name: Check required secrets
         id: check
+        shell: bash
         env:
           BIGBASKET_COOKIE: ${{ secrets.BIGBASKET_COOKIE }}
         run: |
