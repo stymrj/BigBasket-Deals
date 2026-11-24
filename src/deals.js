@@ -219,7 +219,7 @@
 
   // ───────────────────────── State ─────────────────────────
   const S = { products: new Map(), scanning: false, done: 0, total: 0, errors: 0, ctl: null,
-    q: '', brand: '', cat: '', pack: '', unit: '', priceBand: '', preset: '', pick: false, tgm: false,
+    q: '', brand: '', cat: '', drillCat: '', pack: '', unit: '', priceBand: '', preset: '', pick: false, tgm: false,
     favOnly: false, newOnly: false, shown: 60, tab: 'best', panel: false, startedAt: 0, scanMinDisc: null, diag: null, selfTest: null };
 
   // ───────────────────────── Scanner ─────────────────────────
@@ -332,7 +332,7 @@
   function categoryOf(p) { return p.cat.split(' › ')[0]; }
   function filtered() {
     const fav = new Set(store.favs), hid = new Set(store.hidden);
-    const band = PRICE_BANDS[S.priceBand];
+    const band = PRICE_BANDS[S.priceBand], cat = S.drillCat || S.cat;
     const out = [];
     S.products.forEach(p => {
       if (hid.has(p.id)) return;
@@ -341,7 +341,7 @@
       if (store.maxPrice && p.price > store.maxPrice) return;
       if (band && (p.price < band[1] || p.price >= band[2])) return;
       if (S.brand && p.brand !== S.brand) return;
-      if (S.cat && categoryOf(p) !== S.cat) return;
+      if (cat && categoryOf(p) !== cat) return;
       if (S.pack && p.pack !== S.pack) return;
       if (S.unit && p.unit?.base !== S.unit) return;
       if ((S.favOnly || S.tab === 'saved') && !fav.has(p.id)) return;
@@ -748,7 +748,7 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
  <div class="browse-top"><nav class="tabs" aria-label="Deal views">${options.map(([k, l]) => `<button class="${S.tab === k ? 'on' : ''}" aria-pressed="${S.tab === k}" data-act="tab" data-v="${k}">${l}</button>`).join('')}</nav>
  ${S.scanning ? `<span class="live">${ic('scan', 14)}Scanning ${S.done}/${S.total}</span>` : `<span class="matches">${list.length} of ${catalog.length} items</span>`}</div>
  <div class="facets">
-  ${facetSelect('cat', 'Category', S.cat, facetValues(catalog, categoryOf), 'All categories')}
+  ${facetSelect('cat', 'Category', S.drillCat || S.cat, facetValues(catalog, categoryOf), 'All categories')}
   ${facetSelect('brand', 'Brand', S.brand, facetValues(catalog, p => p.brand), 'All brands')}
   ${facetSelect('pack', 'Pack size', S.pack, facetValues(catalog, p => p.pack), 'All sizes')}
   ${facetSelect('unit', 'Compare by', S.unit, Object.entries(UNIT_GROUPS), 'Any unit')}
@@ -936,7 +936,8 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
     if (k === 'depth' || k === 'minDisc' || k === 'maxPrice') { store[k] = +v; save(); }
     else if (k === 'stock' || k === 'sort') { store[k] = v; save(); }
     else if (k === 'favOnly') S.favOnly = v; else if (k === 'newOnly') S.newOnly = v;
-    else if (['cat', 'brand', 'pack', 'unit', 'priceBand'].includes(k)) S[k] = v;
+    else if (k === 'cat') { S.cat = v; S.drillCat = ''; }
+    else if (['brand', 'pack', 'unit', 'priceBand'].includes(k)) S[k] = v;
     else return;
     S.shown = 60; render();
   });
@@ -970,11 +971,11 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
       case 'discount': store.minDisc = +id; save(); S.shown = 60; render(); break;
       case 'preset': S.preset = S.preset === id ? '' : id; S.shown = 60; render(); break;
       case 'resetfilters':
-        Object.assign(S, { q: '', cat: '', brand: '', pack: '', unit: '', priceBand: '', preset: '', favOnly: false, newOnly: false, shown: 60 });
+        Object.assign(S, { q: '', cat: '', drillCat: '', brand: '', pack: '', unit: '', priceBand: '', preset: '', favOnly: false, newOnly: false, shown: 60 });
         Object.assign(store, { minDisc: 0, maxPrice: 0, stock: '' });
         save(); render(); break;
-      case 'tab': S.tab = el.dataset.v; S.shown = 60; render(); { const m = root.getElementById('main'); if (m) m.scrollTop = 0; } break;
-      case 'seeall': S.tab = 'all'; S.cat = id; S.shown = 60; render(); { const m = root.getElementById('main'); if (m) m.scrollTop = 0; } break;
+      case 'tab': S.tab = el.dataset.v; if (S.tab !== 'all') S.drillCat = ''; S.shown = 60; render(); { const m = root.getElementById('main'); if (m) m.scrollTop = 0; } break;
+      case 'seeall': S.tab = 'all'; S.drillCat = id; S.shown = 60; render(); { const m = root.getElementById('main'); if (m) m.scrollTop = 0; } break;
       case 'hide': store.hidden.push(id); save(); render(); toast('Hidden — undo via Data › Unhide'); break;
       case 'unhide': store.hidden = []; save(); render(); break;
       case 'add': store.list[id] = (store.list[id] || 0) + 1; { const p = S.products.get(id); if (p) store._cache[id] = p; } save(); render(); break;

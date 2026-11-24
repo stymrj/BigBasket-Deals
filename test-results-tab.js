@@ -137,6 +137,25 @@ check('filters: unit-price sort can be narrowed to liquid packs', ids() === 'd,e
 Object.assign(filters, { priceBand: 'under100', unit: '' });
 check('filters: fractional prices below a band boundary remain included', ids().split(',').includes('f'));
 
+const handlers = {};
+const events = { addEventListener(k, fn) { handlers[k] = fn; }, getElementById() { return null; } };
+new Function('root', 'store', 'S', 'render',
+  slice("  root.addEventListener('change'", "  document.addEventListener('keydown'", 'filter and view events')
+)(events, prefs, filters, () => {});
+const click = (act, data) => handlers.click({ target: { closest: () => ({ dataset: { act, ...data } }) } });
+Object.assign(filters, { tab: 'best', priceBand: '' });
+prefs.favs = ['d'];
+click('seeall', { id: 'Staples & Oil' });
+check('filters: See all drills down to its category', filters.tab === 'all' && ids() === 'c,a,b');
+click('tab', { v: 'saved' });
+check('filters: Saved includes other categories after leaving See all', ids() === 'd');
+click('tab', { v: 'best' });
+check('filters: Best deals includes other categories after leaving See all', ids() === 'c,a,b,d,e,f');
+click('seeall', { id: 'Staples & Oil' });
+handlers.change({ target: { dataset: { in: 'cat' }, value: 'Beverages' } });
+click('tab', { v: 'best' });
+check('filters: an explicit category overrides See all and persists across tabs', ids() === 'd,e,f');
+
 const cached = items[0];
 const store = { list: { [cached.id]: 2 }, _cache: { [cached.id]: cached } };
 const S = { products: new Map(), panel: true };
