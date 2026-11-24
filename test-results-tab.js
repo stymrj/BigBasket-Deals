@@ -104,6 +104,80 @@ check('search: empty query matches all', matchQuery(salt, '') === true);
 const brandOnly = { title: 'Iodised Salt · 1 kg', brand: 'Tata', cat: 'Staples' };
 check('search: brand metadata matches without appearing in the title', matchQuery(brandOnly, 'tata salt') === true);
 
+const prefs = { favs: [], hidden: [], stock: '', minDisc: 0, maxPrice: 0, sort: 'disc' };
+const filters = { products: new Map(), tab: 'best' };
+const { unitOf, filtered, SORTS } = new Function('store', 'S', 'byDisc',
+  slice('  const UNITS = ', '  // ───────────────────────── UI', 'deal filters') + '\nreturn { unitOf, filtered, SORTS };'
+)(prefs, filters, byDisc);
+const filterItems = extract({ products: [
+  { id: 'a', name: 'Everyday Atta', brand: { name: 'Farm Fresh' }, w: '2 × 500 g', sp: 100, mrp: 200 },
+  { id: 'b', name: 'Whole Wheat Atta', brand: { name: 'Farm Fresh' }, pack_desc: '500 g', sp: 50, mrp: 250, availability: { avail_status: '002' } },
+  { id: 'c', name: 'Semolina', brand: { name: 'Farm Fresh' }, w: '1 kg', sp: 80, mrp: 200 }
+] }, 'Staples & Oil › Foodgrains').concat(extract({ products: [
+  { id: 'd', name: 'Orange Juice', brand: { name: 'Juicy' }, w: '1 L', sp: 49, mrp: 100 },
+  { id: 'e', name: 'Juice Box', brand: { name: 'Juicy' }, w: '200 ml x 4', sp: 40, mrp: 100 },
+  { id: 'f', name: 'Snack', sp: 99.99, mrp: 200 }
+] }, 'Beverages › Beverages'));
+for (const p of filterItems) { p.unit = unitOf(p.pack); filters.products.set(p.id, p); }
+const ids = () => filtered().map(p => p.id).join(',');
+check('filters: pack labels and both multipack formats use API pack metadata',
+  filterItems[1].pack === '500 g' && filterItems[0].unit.qty === 1 && filterItems[4].unit.qty === .8);
+Object.assign(filters, { cat: 'Staples & Oil', brand: 'Farm Fresh', unit: 'kg', pack: '2 × 500 g', priceBand: 'under250' });
+Object.assign(prefs, { minDisc: 50, stock: 'in' });
+check('filters: category, brand, unit, pack, price, discount and stock compose on Best deals', ids() === 'a');
+Object.assign(filters, { pack: '', priceBand: 'under100' });
+check('filters: exact ₹100 goes in the next price band', ids() === 'c');
+prefs.stock = 'out';
+check('filters: out-of-stock groceries can be shown on their own', ids() === 'b');
+Object.assign(prefs, { stock: '', minDisc: 0, sort: 'unit' });
+Object.assign(filters, { cat: '', brand: '', unit: '', priceBand: '' });
+check('filters: unit-price sort compares only like units and puts unknown packs last', ids() === 'c,a,b,d,e,f');
+check('filters: unit-price sort has a compact label', SORTS.unit[0] === 'Unit price');
+Object.assign(filters, { priceBand: 'under100', unit: 'L' });
+check('filters: unit-price sort can be narrowed to liquid packs', ids() === 'd,e');
+Object.assign(filters, { priceBand: 'under100', unit: '' });
+check('filters: fractional prices below a band boundary remain included', ids().split(',').includes('f'));
+
+const handlers = {};
+const events = { addEventListener(k, fn) { handlers[k] = fn; }, getElementById() { return null; } };
+new Function('root', 'store', 'S', 'render',
+  slice("  root.addEventListener('change'", "  document.addEventListener('keydown'", 'filter and view events')
+)(events, prefs, filters, () => {});
+const click = (act, data) => handlers.click({ target: { closest: () => ({ dataset: { act, ...data } }) } });
+Object.assign(filters, { tab: 'best', priceBand: '' });
+prefs.favs = ['d'];
+click('seeall', { id: 'Staples & Oil' });
+check('filters: See all drills down to its category', filters.tab === 'all' && ids() === 'c,a,b');
+click('tab', { v: 'saved' });
+check('filters: Saved includes other categories after leaving See all', ids() === 'd');
+click('tab', { v: 'best' });
+check('filters: Best deals includes other categories after leaving See all', ids() === 'c,a,b,d,e,f');
+click('seeall', { id: 'Staples & Oil' });
+handlers.change({ target: { dataset: { in: 'cat' }, value: 'Beverages' } });
+click('tab', { v: 'best' });
+check('filters: an explicit category overrides See all and persists across tabs', ids() === 'd,e,f');
+
+const initialSelect = { tagName: 'SELECT', dataset: { in: 'stock' } };
+let replacement, rendered;
+const renderRoot = {
+  activeElement: initialSelect,
+  getElementById() { return null; },
+  querySelector(sel) { return sel === 'select[data-in="stock"]' ? replacement : null; }
+};
+const renderApp = {
+  set innerHTML(value) {
+    rendered = value;
+    renderRoot.activeElement = null;
+    replacement = { focus() { renderRoot.activeElement = this; } };
+  }
+};
+const empty = () => '';
+new Function('root', 'app', 'store', 'S', 'esc', 'PLATFORM', 'OFFSITE', 'ic', 'sideOpen', 'sidebar', 'mainView', 'drawer',
+  slice('  function render() {', '  let rq =', 'render focus') + '\nrender();'
+)(renderRoot, renderApp, { theme: 'light', list: { a: 2 }, tg: {} }, {}, esc, 'BigBasket', false, ic, false, empty, empty, empty);
+check('filters: a render restores focus to the replacement dropdown', renderRoot.activeElement === replacement);
+check('shopping list: header control has a name that includes item count', /<button[^>]+data-act="panel"[^>]+aria-label="Shopping list \(2 items\)"/.test(rendered));
+
 const cached = items[0];
 const store = { list: { [cached.id]: 2 }, _cache: { [cached.id]: cached } };
 const S = { products: new Map(), panel: true };
