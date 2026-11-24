@@ -158,7 +158,7 @@ click('tab', { v: 'best' });
 check('filters: an explicit category overrides See all and persists across tabs', ids() === 'd,e,f');
 
 const initialSelect = { tagName: 'SELECT', dataset: { in: 'stock' } };
-let replacement;
+let replacement, rendered;
 const renderRoot = {
   activeElement: initialSelect,
   getElementById() { return null; },
@@ -166,6 +166,7 @@ const renderRoot = {
 };
 const renderApp = {
   set innerHTML(value) {
+    rendered = value;
     renderRoot.activeElement = null;
     replacement = { focus() { renderRoot.activeElement = this; } };
   }
@@ -173,8 +174,9 @@ const renderApp = {
 const empty = () => '';
 new Function('root', 'app', 'store', 'S', 'esc', 'PLATFORM', 'OFFSITE', 'ic', 'sideOpen', 'sidebar', 'mainView', 'drawer',
   slice('  function render() {', '  let rq =', 'render focus') + '\nrender();'
-)(renderRoot, renderApp, { theme: 'light', list: {}, tg: {} }, {}, esc, 'BigBasket', false, ic, false, empty, empty, empty);
+)(renderRoot, renderApp, { theme: 'light', list: { a: 2 }, tg: {} }, {}, esc, 'BigBasket', false, ic, false, empty, empty, empty);
 check('filters: a render restores focus to the replacement dropdown', renderRoot.activeElement === replacement);
+check('shopping list: header control has a name that includes item count', /<button[^>]+data-act="panel"[^>]+aria-label="Shopping list \(2 items\)"/.test(rendered));
 
 const cached = items[0];
 const store = { list: { [cached.id]: 2 }, _cache: { [cached.id]: cached } };

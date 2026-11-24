@@ -817,7 +817,7 @@ kbd{border:1px solid var(--bd);border-radius:5px;padding:0 5px;font-size:11px;fo
  ${capture ? '' : S.scanning ? `<button class="sb stop" data-act="stop" aria-label="Stop scan">${ic('stop', 16)}<span class="lb">Stop</span></button>` : `<button class="sb" data-act="scan" aria-label="Scan deals">${ic('scan', 16)}<span class="lb">Scan</span></button>`}
  <button class="hb tgb" data-act="tgopen" title="Telegram alerts">${ic('send', 16)}<span class="lb">Telegram</span><span class="dot ${store.tg.on && tgReady() ? 'on' : ''}"></span></button>
  <button class="ib" data-act="theme" title="${dark ? 'Light' : 'Dark'} mode">${ic(dark ? 'sun' : 'moon')}</button>
- <button class="hb" data-act="panel" title="Shopping list">${ic('bag')}<span class="lb">List</span>${count ? `<span class="n">${count}</span>` : ''}</button>
+ <button class="hb" data-act="panel" title="Shopping list" aria-label="Shopping list (${count} ${count === 1 ? 'item' : 'items'})">${ic('bag')}<span class="lb">List</span>${count ? `<span class="n">${count}</span>` : ''}</button>
  <button class="ib" data-act="side" title="Tools and settings" aria-expanded="${sideOpen}">${ic('sliders', 17)}</button>
  <button class="ib" data-act="close" title="Close (Esc)">${ic('x')}</button>${S.scanning ? `<div class="prog" style="width:${pct}%"></div>` : ''}</header>
  <div class="body">${sideOpen ? '<div class="scrim side" data-act="side"></div>' : ''}${sidebar()}${mainView()}</div>${S.panel ? '<div class="scrim" data-act="closepanel"></div>' : ''}${drawer()}${S.pick ? pickerUI() : ''}${S.tgm ? tgModal() : ''}<div class="toast" id="toast"></div>`;
